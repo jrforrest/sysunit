@@ -68,21 +68,23 @@ They can expose metadata, have dependencies, receive arguments (optionally requi
 provide arguments to their dependents, receive emitted values from their dependencies,
 and emit values to their dependents.
 
+Here's an example of a unit using these features:
+
 ```sh
 #cat.sh
 
 meta() {
     version 1.5.2
     author "Jack Forrest"
-    params !filename:string, x_dim:int, y_dim:int
+    params "!filename:string, x_dim:int, y_dim:int"
 }
 
 deps() {
-    # Ensure python is installed, tmp dir is created,
-    # install curl using curl.sh unit more recent than version 2.3,
-    # capture binary_path emitted from curl.sh into the $curl_binary_path variable.
-    # This capture is required, so the unit will fail if curl.sh does not emit binary_path.
-    dep "pkg name=python, dir.sh path=./tmp/, curl.sh:>2.3 -> !binary_path:curl_binary_path:string";
+    dep 'pkg.sh name="python"'
+    dep 'dir.sh path="./tmp/"
+    # curl.sh emits the path to the installed curl binary, which we require
+    # and capture here.
+    dep 'curl.sh -> !binary_path:curl_binary_path:string'
 }
 
 check() [ -f ./tmp/$filename] && emit_ok;
@@ -112,7 +114,7 @@ Sysunit's resolver ensures that the dependency is run only once.  Values it emit
 supplied to each dependent.  Circular dependencies are not permitted.
 
 ### Unit Execution
-### Contributing
 
-See DEV\_NOTES.md for some feature ideas. PRs are welcome but open an issue before you put a lot of work
-into something.
+## License
+
+This project is licensed under the GNU Affero General Public License (AGPL) v3.0. See the [LICENSE](LICENSE) file for details.
