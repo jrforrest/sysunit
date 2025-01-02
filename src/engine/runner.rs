@@ -24,7 +24,6 @@ type ExecutionMap = HashMap<UnitArc, ExecutionArc>;
 /// internally, so it can be called from async tasks safely.  Individual unit unit_executions
 /// are behind their own mutexes as well, so running an operation on one unit should not block
 /// another.
-#[derive(Clone)]
 pub struct Runner {
     unit_executions: Arc<Mutex<ExecutionMap>>,
     loader: Loader,
@@ -89,7 +88,7 @@ impl Runner {
         }
 
         // If it's not present yet, create a new unit execution and add it to the map
-        let script = self.loader.get_script(&unit.name).await?;
+        let script = self.loader.load(&unit.name).await?;
         let mut execution = UnitExecution::init(unit.clone(), self.ev_handler.clone(), &script).await?;
         let meta = execution.get_meta().await?;
         let args = self.build_args_for(unit.clone(), meta).await?;

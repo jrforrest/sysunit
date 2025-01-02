@@ -51,7 +51,7 @@ impl fmt::Debug for Engine {
 
 impl Engine {
     pub fn new(opts: Opts, observers: Vec<ObserverArc>) -> Engine {
-        let loader = Loader::new(opts.search_paths.clone());
+        let loader = Loader::from_search_paths(opts.search_paths.clone());
         let ev_handler = EventHandler::new(observers);
         let runner = Runner::new(loader, ev_handler.clone());
 

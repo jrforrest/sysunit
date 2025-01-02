@@ -1,0 +1,8 @@
+Crash on unit Remove
+---
+
+jack@jacks-panda~$ sysu -p ~/etc/units remove leetcode-cli.sh
+thread 'main' panicked at src/cli/reporter/ctx/root.rs:74:18:
+internal error: entered unreachable code
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+zsh: IOT instruction  sysu -p ~/etc/units remove leetcode-cli.sh

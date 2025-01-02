@@ -13,7 +13,7 @@ use crate::models::{Dependency, version::VersionSpecification, Target};
 
 use nom::{
     combinator::opt,
-    bytes::complete::tag,
+    bytes::complete::{take_while1, tag},
     multi::separated_list1,
     sequence::{tuple, preceded, terminated},
 };
@@ -22,12 +22,17 @@ use super::{
     arg_values::args,
     captures::captures,
     version::version_spec,
-    common::{label, VResult},
+    common::{VResult, ws},
     target::target,
 };
 
 pub fn deps(input: &str) -> VResult<Vec<Dependency>> {
     separated_list1(tag(","), dep)(input)
+}
+
+// labels in deps allow paths
+fn label(input: &str) -> VResult<&str> {
+    ws(take_while1(|c: char| c.is_alphanumeric() || c == '_' || c == '-' || c == '.' || c == '/'))(input)
 }
 
 fn dep(input: &str) -> VResult<Dependency> {
