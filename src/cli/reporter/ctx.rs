@@ -8,6 +8,8 @@ mod op;
 
 pub use root::Ctx as RootContext;
 
+/// Output handle that can be passed between contexts.  Makes
+/// indentation for nested contexts a little easier.
 #[derive(Clone)]
 struct Out {
     idt: usize,
