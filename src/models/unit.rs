@@ -11,8 +11,10 @@ use std::sync::Arc;
 
 pub type UnitArc = Arc<Unit>;
 
-/// A pointer to a unit.  These are disambiguated by ID.  Many unit structs with the
-/// same ID may be instantiated at once.  Actual unit state is stored in the executor.
+/// A Unit represents a single unit of change to be applied to the system.  It's
+/// identified by its name, arguments and target.  Many unit structs may be instantiated
+/// with matching IDs, but they will resolve to the same execution, so each unit is only
+/// run once.
 #[derive(Debug)]
 pub struct Unit {
     pub name: String,
@@ -64,3 +66,13 @@ impl ResolvableNode for UnitArc {
 }
 
 use crate::engine::ResolvableNode;
+
+/// Definitions represent the combination of name and script from which units
+/// are instantiated.  Single-file units are loaded directly from the file system,
+/// so no UnitDefinition need be defined, but UnitFiles need a mapping of names to
+/// script.
+#[derive(Debug)]
+pub struct UnitDefinition {
+    pub name: String,
+    pub script: String
+}

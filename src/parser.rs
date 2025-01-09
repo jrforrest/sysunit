@@ -101,3 +101,7 @@ pub fn parse_value(input: &str) -> Result<Value> {
 pub fn parse_deps(input: &str) -> Result<Vec<Dependency>> {
     parse_with_better_errors(input, deps)
 }
+
+pub fn parse_unitfile_header(input: &str) -> Result<String> {
+    parse_with_better_errors(input, unit_file::header)
+}
