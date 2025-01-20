@@ -34,6 +34,7 @@ pub struct Opts {
     pub operation: Operation,
     pub unit: UnitArc,
     pub adapters: Vec<Adapter>,
+}
 
 pub struct Engine {
     runner: Runner,

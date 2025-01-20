@@ -40,6 +40,7 @@ impl CLI {
         }
 
         Ok(adapters)
+    }
 
     fn get_verbosity_level(&self) -> Result<Verbosity> {
         let debug = self.matches.get_flag("debug");
