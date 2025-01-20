@@ -9,7 +9,7 @@ use std::fmt;
 use std::collections::HashMap;
 
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Clone)]
 pub enum ValueType {
     String,
     Int,
@@ -170,10 +170,6 @@ impl ValueSet {
         for (k, v) in &other.values {
             self.values.insert(k.clone(), v.clone());
         }
-    }
-
-    pub fn contains_key(&self, name: &str) -> bool {
-        self.values.contains_key(name)
     }
 
     /* Provides SHA1sum of all values combined */

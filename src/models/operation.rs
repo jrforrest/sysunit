@@ -1,10 +1,8 @@
 //! Operation which is to be applied to a unit in an execution
 use std::str::FromStr;
 use std::fmt;
-use std::sync::Arc;
 
 use anyhow::{anyhow, Result, Context};
-use super::{ValueSet, Dependency, Meta};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Operation {
@@ -52,14 +50,14 @@ impl OpStatus {
             context(format!("Failed to parse emitted status code string: {}", code_str))?;
         match i {
             0 => Ok(OpStatus::Ok),
-            _ => Ok(OpStatus::Failed(i)),
+            n => Ok(OpStatus::Failed(n)),
         }
     }
 
     pub fn expect_ok(&self) -> Result<()> {
         match self {
             OpStatus::Ok => Ok(()),
-            _ => Err(anyhow!("Operation failed on unit.  Status: {:?}", self)),
+            OpStatus::Failed(n) => Err(anyhow!("Operation failed on unit. Exit Code: {}", n)),
         }
     }
 }
@@ -68,21 +66,9 @@ pub type CheckPresence = bool;
 
 #[derive(Debug, Clone)]
 pub enum OpCompletion {
-    Check(OpStatus, CheckPresence, Arc<ValueSet>),
-    Apply(OpStatus, Arc<ValueSet>),
-    Remove(OpStatus, Arc<ValueSet>),
-    Deps(OpStatus, Arc<Vec<Dependency>>),
-    Meta(OpStatus, Arc<Meta>),
-}
-
-impl OpCompletion {
-    pub fn get_status(&self) -> &OpStatus {
-        match self {
-            OpCompletion::Check(status, _, _) => status,
-            OpCompletion::Apply(status, _) => status,
-            OpCompletion::Remove(status, _) => status,
-            OpCompletion::Deps(status, _) => status,
-            OpCompletion::Meta(status, _) => status,
-        }
-    }
+    Check(CheckPresence),
+    Apply,
+    Remove,
+    Deps,
+    Meta,
 }

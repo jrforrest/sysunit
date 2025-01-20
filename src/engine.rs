@@ -10,6 +10,7 @@ mod resolver;
 mod unit_execution;
 mod shell_executor;
 mod runner;
+mod executor_pool;
 
 pub use resolver::ResolvableNode;
 
@@ -17,7 +18,7 @@ use crate::models::{UnitArc, Operation};
 use crate::events::{Event, EventHandler, ObserverArc};
 
 use tracing::instrument;
-use std::fmt;
+use std::{fmt, sync::Arc, collections::HashMap};
 
 use loader::Loader;
 use resolver::resolve;
@@ -26,22 +27,28 @@ use anyhow::Result;
 use async_std::path::PathBuf;
 use runner::Runner;
 
-
 #[derive(Debug)]
 pub struct Opts {
     pub remove_deps: bool,
+    pub debug: bool,
     pub search_paths: Vec<PathBuf>,
     pub operation: Operation,
     pub unit: UnitArc,
+    pub adapters: HashMap<String, String>,
+}
+
+#[derive(Clone)]
+pub struct Context {
+    pub opts: Arc<Opts>,
+    pub ev_handler: EventHandler,
 }
 
 pub struct Engine {
     runner: Runner,
     ev_handler: EventHandler,
-    opts: Opts,
+    opts: Arc<Opts>,
 }
 
-// impl a brief debug representation of Engine
 impl fmt::Debug for Engine {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Engine {{ opts: {:?} }}", self.opts)?;
@@ -53,7 +60,12 @@ impl Engine {
     pub fn new(opts: Opts, observers: Vec<ObserverArc>) -> Engine {
         let loader = Loader::from_search_paths(opts.search_paths.clone());
         let ev_handler = EventHandler::new(observers);
-        let runner = Runner::new(loader, ev_handler.clone());
+        let opts = Arc::new(opts);
+        let ctx = Context {
+            opts: opts.clone(),
+            ev_handler: ev_handler.clone(),
+        };
+        let runner = Runner::new(loader, ctx);
 
         Engine {
             ev_handler,
@@ -79,6 +91,8 @@ impl Engine {
             _ => panic!("Operation {:?} can't be run directly", op),
         };
 
+        self.runner.finalize().await?;
+
         let finalization_event = match result {
             Ok(_) => Event::EngineSuccess,
             Err(ref e) => Event::Error(format!("{:#}", e)),
@@ -86,13 +100,15 @@ impl Engine {
 
         self.ev_handler.handle(finalization_event)?;
 
-        result
+        // Any errors have been sent to the event handler for display, so we can
+        // return OK upstream
+        Ok(())
     }
 
     async fn run_with_dependencies(&mut self, unit: UnitArc, op: Operation) -> Result<()> {
         self.ev_handler.handle(Event::Resolving)?;
 
-        let ordered_units = resolve(unit, &self.runner).await?;
+        let ordered_units = resolve(unit, &mut self.runner).await?;
 
         self.ev_handler.handle(Event::Resolved(ordered_units.clone()))?;
 
@@ -105,9 +121,7 @@ impl Engine {
 
     #[instrument]
     async fn run_unit(&mut self, unit: UnitArc, op: Operation) -> Result<()> {
-        self.runner.set_captures(unit.clone()).await?;
-
-        async fn do_op(runner: &Runner, unit: UnitArc, op: Operation) -> Result<()> {
+        async fn do_op(runner: &mut Runner, unit: UnitArc, op: Operation) -> Result<()> {
             match op {
                 Operation::Check => {
                     runner.check(unit).await?;
@@ -128,8 +142,7 @@ impl Engine {
             Ok(())
         }
 
-        let result = do_op(&self.runner, unit.clone(), op).await;
-        self.runner.finalize(unit.clone()).await?;
+        let result = do_op(&mut self.runner, unit.clone(), op).await;
         return result;
     }
 }

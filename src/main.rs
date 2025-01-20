@@ -1,7 +1,6 @@
 mod cli;
 mod engine;
 mod models;
-mod util;
 mod parser;
 mod events;
 

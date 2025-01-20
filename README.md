@@ -107,6 +107,20 @@ remove() rm ./tmp/$filename;
 sysunit apply cat.sh -a filename=kitty.jpg -a x_dim=200 -a y_dim=200
 ```
 
+### Targets
+
+Units may be run against other systems or containers by specifying a target:
+
+```sh
+sysunit apply cat.sh -t ssh://user@host -a filename=kitty.jpg
+```
+
+Currently, the ssh://, local://, and podman:// schemes are supported.
+
+Specifying users only works with the ssh:// scheme.
+
+SSH can prompt for a password via the controlling TTY, but passwordless SSH access is advised.
+
 ### Dependencies
 
 Units are identified uniquely by their name, and arguments.  When a unit has multiple dependants,

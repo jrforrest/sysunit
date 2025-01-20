@@ -1,12 +1,21 @@
 ### 0.5
 
-- [ ] Don't show sh -x output without --debug
+- [x] Don't show sh -x output without --debug
     - Don't set the -x flag when the running under --debug
     - Probably need to pass something down through EngineOptions for this.
-- [ ] UnitFile
+- [x] UnitFile
     - Allow multiple units in a file to enable make-like workflows
 
 ### 0.6
+
+
+- [x] Allow running units through things other than /bin/sh
+    - Protocols on target hosts can be mapped to adapters
+    - Allow an adapter mapping to be provided in CLI args or in a TOML file
+      that lets the user specify the adapter to use for a given protocol.
+
+### 0.7
+
 
 - [ ] Add unit aliases
   - An alias allows a unit (along with its arguments) to be referred to by a nicer label.
@@ -21,13 +30,6 @@
 - [ ] CLI Improvements
     - Show less states in default mode.  One line for loading a unit should be fine.
 
-### 0.7
-
-- [ ] Allow running units through things other than /bin/sh
-    - Protocols on target hosts can be mapped to adapters
-    - Allow an adapter mapping to be provided in CLI args or in a TOML file
-      that lets the user specify the adapter to use for a given protocol.
-
 ### 0.8
 
 - [ ] Unit Meta
@@ -36,4 +38,4 @@
         that just prints out the unit.
     - Allow description on unit, and a nice way to render it in the UI
     - Allow version specifiers 
-    - A bunch of this logic was there previously but stripped out, should be in git history
+      - A bunch of this logic was there previously but stripped out, should be in git history

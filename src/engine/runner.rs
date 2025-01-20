@@ -1,105 +1,77 @@
-//! Top-level interface for running units
-
+//! Contains logic for running operations on units and managing their execution state
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use anyhow::{Result, anyhow};
 
-use crate::models::{Unit, UnitArc, Dependency, Meta, ValueSet};
-use crate::events::EventHandler;
+use crate::models::{Operation, Unit, UnitArc, Dependency, Meta, ValueSet};
 use super::unit_execution::UnitExecution;
-
-use tracing::instrument;
+use super::Context as EngineContext;
+use super::executor_pool::ExecutorPool;
 
 use super::{
     loader::Loader,
     resolver::DependencyFetcher,
 };
 
-
-type ExecutionArc = Arc<Mutex<UnitExecution>>;
-type ExecutionMap = HashMap<UnitArc, ExecutionArc>;
-
-/// Provides an atomic reference counted, interior mutable interface for managing the
-/// execution of units.  It contains state of individual unit executions behind a mutex
-/// internally, so it can be called from async tasks safely.  Individual unit unit_executions
-/// are behind their own mutexes as well, so running an operation on one unit should not block
-/// another.
 pub struct Runner {
-    unit_executions: Arc<Mutex<ExecutionMap>>,
+    ctx: EngineContext,
     loader: Loader,
-    ev_handler: EventHandler,
-}
-
-/// Handles repetitve mutex boilerplate for the many functions that
-/// need to lock unit executions below
-macro_rules! run_ex {
-    ($self:ident, $unit:ident, $op:ident) => {
-        {
-            let ex_arc = $self.get_unit_execution($unit.clone())
-                .await
-                .map_err(|e| e.context(format!("Failed to run unit {}", $unit.name)))
-                ?;
-            let mut unit_execution = ex_arc.lock().unwrap();
-            unit_execution.$op().await
-        }
-    }
+    executor_pool: ExecutorPool,
+    unit_executions: HashMap<UnitArc, UnitExecution>,
 }
 
 impl Runner {
-    pub fn new(loader: Loader, ev_handler: EventHandler) -> Runner {
+    pub fn new(loader: Loader, ctx: EngineContext) -> Runner {
         Runner {
-            ev_handler,
+            ctx,
             loader,
-            unit_executions: Arc::new(Mutex::new(HashMap::new())),
+            executor_pool: ExecutorPool::new(),
+            unit_executions: HashMap::new(),
         }
     }
-
-    pub async fn get_deps(&self, unit: UnitArc) -> Result<Arc<Vec<Dependency>>> {
-        run_ex!(self, unit, get_deps)
+    
+    pub async fn get_deps(&mut self, unit: UnitArc) -> Result<&Vec<Dependency>> {
+        let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Meta);
+        let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
+        let execution = self.get_unit_execution(unit.clone()).await;
+        execution.get_deps(executor_arc, op_ev_handler).await
+    }
+    
+    pub async fn remove(&mut self, unit: UnitArc) -> Result<()> {
+        let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Remove);
+        let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
+        let execution = self.get_unit_execution(unit.clone()).await;
+        execution.remove(executor_arc, op_ev_handler).await
+    }
+    
+    pub async fn apply(&mut self, unit: UnitArc) -> Result<()> {
+        let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Apply);
+        let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
+        let execution = self.get_unit_execution(unit.clone()).await;
+        execution.apply(executor_arc, op_ev_handler).await
     }
 
-    pub async fn check(&self, unit: UnitArc) -> Result<bool> {
-        run_ex!(self, unit, check)
+    pub async fn check(&mut self, unit: UnitArc) -> Result<bool> {
+        let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Check);
+        let deps = {
+            let deps = self.get_deps(unit.clone()).await?;
+            deps.clone()
+        };
+        let captures = self.get_captures(unit.clone(), &deps).await?;
+        let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
+        let execution = self.get_unit_execution(unit.clone()).await;
+        execution.set_args(&captures).await;
+        let e = execution.check(executor_arc, op_ev_handler).await?;
+        Ok(e)
     }
 
-    pub async fn apply(&self, unit: UnitArc) -> Result<()> {
-        run_ex!(self, unit, apply)
-    }
-
-    pub async fn remove(&self, unit: UnitArc) -> Result<()> {
-        run_ex!(self, unit, remove)
-    }
-
-    pub async fn finalize(&self, unit: UnitArc) -> Result<()> {
-        run_ex!(self, unit, finalize)
-    }
-
-    async fn get_emit_data(&self, unit: UnitArc) -> Result<Arc<ValueSet>> {
-        run_ex!(self, unit, get_emit_data)
-    }
-
-    async fn get_unit_execution(&self, unit: UnitArc) -> Result<ExecutionArc> {
-        // Return the existing unit execution if it's already present in the unit executions map
-        {
-            let existing_units = self.unit_executions.lock().unwrap();
-            if let Some(executor) = existing_units.get(&unit) {
-                return Ok(executor.clone());
+    async fn get_unit_execution(&mut self, unit: UnitArc) -> &mut UnitExecution {
+        match self.unit_executions.get_mut(&unit) {
+            Some(execution) => execution,
+            None => {
+                panic!("Unit not initialized: {:?}", unit);
             }
         }
-
-        // If it's not present yet, create a new unit execution and add it to the map
-        let script = self.loader.load(&unit.name).await?;
-        let mut execution = UnitExecution::init(unit.clone(), self.ev_handler.clone(), &script).await?;
-        let meta = execution.get_meta().await?;
-        let args = self.build_args_for(unit.clone(), meta).await?;
-        execution.set_args(args).await?;
-
-        let arc = Arc::new(Mutex::new(execution));
-
-        let mut unit_executions = self.unit_executions.lock().unwrap();
-        unit_executions.insert(unit.clone(), arc.clone());
-
-        Ok(arc)
     }
 
     // A unit first needs to have arguments injected.  Then before running check/apply, it
@@ -107,7 +79,7 @@ impl Runner {
     //
     // Without these args being injected in phases, the unit would need for its dependencies
     // to have executed... before the deps operation.  This is recursive.
-    async fn build_args_for(&self, unit: UnitArc, meta: Arc<Meta>) -> Result<ValueSet> {
+    async fn build_args_for(&self, unit: UnitArc, meta: &Meta) -> Result<ValueSet> {
         // Check that all required parameters have corresponding arguments
 
         for param in meta.params.iter() {
@@ -129,27 +101,36 @@ impl Runner {
         Ok(unit.args.clone())
     }
 
+    pub async fn finalize(&mut self) -> Result<()> {
+        self.executor_pool.finalize().await
+    }
+
     /// Assembles the arguments that should be passed to a unit which is to be executed.
     /// These include the arguments passed to the unit itself, as well as any captures
     /// from dependencies.
-    #[instrument(skip(self))]
-    pub async fn set_captures(&self, unit: UnitArc) -> Result<()> { 
-        let execution_arc = self.get_unit_execution(unit.clone()).await?;
-        let mut execution = execution_arc.lock().unwrap();
-        let deps = execution.get_deps().await?;
-
+    pub async fn get_captures(&self, unit: UnitArc, deps: &Vec<Dependency>) -> Result<ValueSet> { 
         let mut captures = ValueSet::new();
 
         // Check that all captures are present and of the correct type and add them to the args
         for dep in deps.iter() {
-            let dep_unit: UnitArc = Arc::new(Unit::new(dep.name.clone(), dep.args.clone(), dep.target.clone()));
+            let target = match dep.target {
+                Some(ref target) => target.clone(),
+                None => unit.target.clone(),
+            };
+            let dep_unit: UnitArc = Arc::new(Unit::new(dep.name.clone(), dep.args.clone(), target));
 
-            // Unit must already be running at this point.
-            let emitted_values = self.get_emit_data(dep_unit.clone()).await?;
+            // Assume the unit has already been run and has emit values
+            let emitted_values = match self.unit_executions.get(&dep_unit).map(|execution| &execution.emit_data) {
+                Some(data) => data,
+                None => panic!("Can't get emit values, unit not initialized: {:?}", unit),
+            };
+
             for capture in dep.captures.iter() {
                 let value = emitted_values
                     .get(&capture.name)
-                    .ok_or_else(|| anyhow!("Capture could not be satisfied: {}:{}", dep_unit, capture.name))?;
+                    .ok_or_else(|| {
+                        anyhow!("Unit {} expected its dependency {} to emit a value for capture: {}", unit.name, dep_unit.name, capture.name)
+                    })?;
 
                 // Default the alias to the capture's name if not specified
                 let alias = match &capture.alias {
@@ -171,22 +152,51 @@ impl Runner {
             }
         }
 
-        execution.set_args(captures.clone()).await?;
-        Ok(())
+        Ok(captures)
+    }
+
+    /// Initializes a unit, running its meta and deps operations
+    async fn load_unit(&mut self, unit: UnitArc) -> Result<&UnitExecution> {
+        let script = self.loader.load(&unit.name).await?;
+        let mut execution = UnitExecution::new(script).await?;
+        let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
+        
+        // Run the units meta operation to get its metadata
+        let meta = {
+            let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Meta);
+            execution.get_meta(executor_arc.clone(), op_ev_handler).await?
+        };
+
+        // Sets the arguments given for the unit on its execution so they can be used for
+        // following operations
+        let args = self.build_args_for(unit.clone(), meta).await?;
+        execution.set_args(&args).await;
+
+        // Run the units deps operation to get its dependencies
+        let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Deps);
+        execution.get_deps(executor_arc, op_ev_handler).await?;
+
+        self.unit_executions.insert(unit.clone(), execution);
+        Ok(self.unit_executions.get(&unit).unwrap())
     }
 }
 
 impl DependencyFetcher<UnitArc> for Runner {
-    async fn get_node_dependencies(&self, unit: UnitArc) -> Result<Vec<UnitArc>> {
-        let deps = self.get_deps(unit.clone()).await?;
-        let units = deps
+    async fn get_node_dependencies(&mut self, unit: UnitArc) -> Result<Vec<UnitArc>> {
+        let execution = if let Some(execution) = self.unit_executions.get(&unit) {
+            execution
+        } else {
+            self.load_unit(unit.clone()).await?
+        };
+
+        let units = execution.deps.as_ref().unwrap()
             .iter()
             .map(|dep| {
                 let target = match dep.target {
-                    Some(ref target) => Some(target.clone()),
+                    Some(ref target) => target.clone(),
                     None => unit.target.clone(),
                 };
-                let unit = Unit::new(dep.name.clone(), dep.args.clone(), target.clone());
+                let unit = Unit::new(dep.name.clone(), dep.args.clone(), target);
                 Arc::new(unit)
             })
             .collect();

@@ -3,12 +3,14 @@
 
 use crate::{
     engine::Opts as EngineOpts,
-    models::{Operation, Unit, Value, ValueSet},
+    models::{Operation, Unit, Value, ValueSet, Target},
     parser::parse_target,
 };
 
 use anyhow::{anyhow, Result};
 use clap::{Arg, Command};
+
+use std::collections::HashMap;
 
 use async_std::path::PathBuf;
 
@@ -26,6 +28,20 @@ impl CLI {
         let cli = CLI { matches };
 
         Ok(cli)
+    }
+
+    fn get_adapters(&self) -> Result<HashMap<String, String>> {
+        let mut adapters = std::collections::HashMap::new();
+
+        if let Some(adapter_str) = self.matches.get_one::<String>("adapter") {
+            let parts: Vec<&str> = adapter_str.split('=').collect();
+            if parts.len() != 2 {
+                return Err(anyhow!("Adapter must be in the form of PROTOCOL=COMMAND"));
+            }
+            adapters.insert(parts[0].to_string(), parts[1].to_string());
+        }
+
+        Ok(adapters)
     }
 
     fn get_verbosity_level(&self) -> Result<Verbosity> {
@@ -63,8 +79,10 @@ impl CLI {
                 .unwrap()
                 .parse::<Operation>()
                 .unwrap(),
+            debug: self.matches.get_flag("debug"),
             search_paths: self.get_search_paths()?,
             unit: self.get_unit()?.into(),
+            adapters: self.get_adapters()?,
         };
 
         let operation = engine_opts.operation;
@@ -100,8 +118,8 @@ impl CLI {
         }
 
         let target = match matches.get_one::<String>("target") {
-            Some(t) => Some(parse_target(t)?),
-            None => None,
+            Some(t) => parse_target(t)?,
+            None => Target::default(),
         };
 
         Ok(Unit::new(unit_name.to_string(), arg_set, target))
@@ -192,6 +210,13 @@ fn get_cli_definition() -> Command {
                 .short('a')
                 .action(clap::ArgAction::Append)
                 .value_name("KEY=VALUE")
+                .num_args(1),
+        )
+        .arg(
+            Arg::new("adapter")
+                .help("Specify protocol and command in the form of <protocol>=<command>")
+                .long("adapter")
+                .value_name("PROTOCOL=COMMAND")
                 .num_args(1),
         )
 }

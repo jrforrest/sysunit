@@ -1,101 +1,159 @@
-//! Runs units via posix SH
+//! Runs units via posix sh
 
-use tracing::instrument;
-use std::fmt;
+use anyhow::{anyhow, Result};
+use crate::engine::shell_executor::adapter::build_command;
 use crate::{
-    models::{UnitArc, Operation, OpCompletion, ValueSet},
-    events::{Event, EventHandler, OpEventHandler},
+    models::{Target, Operation, ValueSet, Dependency, Meta, OpCompletion},
+    events::{Event, OpEventHandler, OpEvent},
 };
 
-use std::collections::HashMap;
-use anyhow::{Result, anyhow};
+use async_process::ChildStdout;
+
+use super::Context as EngineContext;
 
 mod subprocess;
 mod stdout_data;
 mod message_stream;
+mod adapter;
 
-use subprocess::{Command, Subprocess};
+use subprocess::Subprocess;
 use message_stream::MessageStream;
 
 const SHELL_SLUG: &str = include_str!("shell_slug.template.sh");
 
-const SHELL_OPTS: [&str; 3] = ["-e", "-x", "-u"];
-
+/// Executes a unit's shell script and provides an interface to interract with it
 pub struct ShellExecutor {
     subprocess: Subprocess,
-    unit: UnitArc,
-    ev_handler: EventHandler,
+    ctx: EngineContext,
+    msg_stream: MessageStream<ChildStdout>,
 }
 
-impl fmt::Debug for ShellExecutor {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ShellExecutor {{ unit: {:?} }}", self.unit)
-    }
-}
-
-/// Executes a unit's shell script and provides an interface to interract with it
 impl ShellExecutor {
     pub async fn init(
-        unit: UnitArc,
-        script: &str,
-        ev_handler: EventHandler,
+        target: &Target,
+        ctx: EngineContext,
     ) -> Result<Self> {
-        let command = build_command(unit.clone())?;
-        let subprocess = Subprocess::init(command)?;
+        let command = build_command(target, &ctx.opts)?;
+        let mut subprocess = Subprocess::init(command)?;
+        let stdout_parser = stdout_data::StdoutDataProducer::new(subprocess.take_stdout());
+        let msg_stream = MessageStream::new(stdout_parser);
 
         let mut executor = ShellExecutor {
             subprocess,
-            ev_handler,
-            unit: unit.clone(),
+            ctx,
+            msg_stream,
         };
 
-        executor.send_stdin(&format!("UNIT_NAME={}\n", unit.name)).await?;
         executor.send_stdin(SHELL_SLUG).await?;
-        executor.send_stdin(script).await?;
 
         Ok(executor)
     }
-
-    /// Set arguments for the unit
-    pub async fn set_args(&mut self, args: ValueSet) -> Result<()> {
-        for (key, value) in args.values.iter() {
-            self.send_stdin(&format!("{}=\"{}\"\n", key, value)).await?
+    
+    pub async fn get_meta(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<Meta> {
+        op_ev_handler.handle(OpEvent::Started)?;
+        self.run_op(Operation::Meta, script, args).await?;
+        match self.msg_stream.get_meta(op_ev_handler.clone()).await {
+            Ok(meta) => {
+                op_ev_handler.handle(OpEvent::Complete(OpCompletion::Meta))?;
+                Ok(meta)
+            },
+            Err(e) => {
+                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
+                Err(e)
+            }
         }
+    }
+    
+    pub async fn get_deps(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<Vec<Dependency>> {
+        op_ev_handler.handle(OpEvent::Started)?;
+        self.run_op(Operation::Deps, script, args).await?;
+        match self.msg_stream.get_deps(op_ev_handler.clone()).await {
+            Ok(deps) => {
+                op_ev_handler.handle(OpEvent::Complete(OpCompletion::Deps))?;
+                Ok(deps)
+            },
+            Err(e) => {
+                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
+                Err(e)
+            }
+        }
+    }
+    
+    pub async fn check(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<(bool, ValueSet)> {
+        op_ev_handler.handle(OpEvent::Started)?;
+        self.run_op(Operation::Check, script, args).await?;
+        match self.msg_stream.get_check_values(op_ev_handler.clone()).await {
+            Ok((present, values)) => {
+                op_ev_handler.handle(OpEvent::Complete(OpCompletion::Check(present)))?;
+                Ok((present, values))
+            },
+            Err(e) => {
+                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
+                Err(e)
+            }
+        }
+    }
+    
+    pub async fn apply(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<ValueSet> {
+        op_ev_handler.handle(OpEvent::Started)?;
+        self.run_op(Operation::Apply, script, args).await?;
+        match self.msg_stream.get_apply_values(op_ev_handler.clone()).await {
+            Ok(values) => {
+                op_ev_handler.handle(OpEvent::Complete(OpCompletion::Apply))?;
+                Ok(values)
+            },
+            Err(e) => {
+                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
+                Err(e)
+            }
+        }
+    }
+    
+    pub async fn remove(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<ValueSet> {
+        op_ev_handler.handle(OpEvent::Started)?;
+        self.run_op(Operation::Remove, script, args).await?;
+        match self.msg_stream.get_remove_values(op_ev_handler.clone()).await {
+            Ok(values) => {
+                op_ev_handler.handle(OpEvent::Complete(OpCompletion::Remove))?;
+                Ok(values)
+            },
+            Err(e) => {
+                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
+                Err(e)
+            }
+        }
+    }
+
+    /// Runs an operation from the given script
+    async fn run_op(&mut self, op: Operation, script: &str, args: &ValueSet) -> Result<()> {
+        let argstr = args_str(args);
+        let set_str = if self.ctx.opts.debug {
+            "set -e -u -x\n"
+        } else {
+            "set -e -u\n"
+        };
+        self.send_stdin(&format!("(\n{}\n{}\n{}\n{}\n)\n _emit status $? \n", set_str, script, argstr, op.to_string())).await?;
+
         Ok(())
     }
 
-    /// Run an operation on the unit
-    pub async fn run_op(&mut self, op: Operation, op_ev_handler: OpEventHandler) -> Result<OpCompletion> {
-        self.run_command(&op.to_string()).await?;
-        let mut stdout_parser = stdout_data::StdoutDataProducer::new(self.subprocess.get_stdout());
-        let mut message_stream = MessageStream::new(&mut stdout_parser, op_ev_handler.clone());
+    /// Close pipes to the shell subprocess and wait for it to exit
+    pub async fn finalize(mut self) -> Result<()> {
+        use async_std::io::ReadExt;
+        let mut stderr = String::new();
+        let subprocess_string = self.subprocess.command_string();
+        self.msg_stream.finalize()?;
+        self.subprocess.close_stdin()?;
+        self.subprocess.get_stderr().read_to_string(&mut stderr).await?;
 
-        let opc = match op {
-            Operation::Meta => message_stream.get_meta().await,
-            Operation::Deps => message_stream.get_deps().await,
-            Operation::Check => message_stream.get_check_values().await,
-            Operation::Apply => message_stream.get_apply_values().await,
-            Operation::Remove => message_stream.get_remove_values().await,
-        }?;
-
-        Ok(opc)
-    }
-
-    #[instrument]
-    /// Close pipes to the unit and wait for it to exit
-    pub async fn finalize(self) -> Result<()> {
         let status_code = self.subprocess.finalize().await?;
 
         if status_code != 0 {
-            return Err(anyhow!("Shell script for unit {} exited with status code {}", self.unit.name, status_code));
+            return Err(anyhow!("adapter exited with status code {} {}", status_code, stderr));
         }
 
-        self.ev_handler.handle(Event::Debug(format!("Script {} exited", self.unit.name)))?;
+        self.ctx.ev_handler.handle(Event::Debug(format!("Executor {:?} exited", subprocess_string)))?;
         Ok(())
-    }
-
-    async fn run_command(&mut self, command: &str) -> Result<()> {
-        self.send_stdin(&format!("( {} )\n _emit status $? \n", command)).await
     }
 
     async fn send_stdin(&mut self, data: &str) -> Result<()> {
@@ -103,25 +161,10 @@ impl ShellExecutor {
     }
 }
 
-fn build_command(unit: UnitArc) -> Result<Command> {
-    let command = match unit.target {
-        Some(ref target) => {
-            if target.host != "localhost" {
-                return Err(anyhow!("Can't run on target: {}.  Remote targets not supported yet", target));
-            }
-
-            Command {
-                cmd: "su".into(),
-                args: vec!["-".into(), target.user.clone(), "-c".into(), "/bin/sh".into()],
-                env: HashMap::new(),
-            }
-        },
-        None => Command {
-            cmd: "/bin/sh".into(),
-            args: SHELL_OPTS.iter().map(|s| s.to_string()).collect(),
-            env: HashMap::new(),
-        }
-    };
-
-    Ok(command)
+fn args_str(args: &ValueSet) -> String {
+    let mut argstr = String::new();
+    for (key, value) in args.values.iter() {
+        argstr.push_str(&format!("{}=\"{}\"\n", key, value));
+    }
+    argstr
 }

@@ -1,21 +1,29 @@
 //! Async execution and communication with child processes
 use std::collections::HashMap;
 
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Result, Context};
 
-use async_process::{Command as AsyncCommand, Child, Stdio, ChildStdout};
+use async_process::{Command as AsyncCommand, Child, Stdio, ChildStdout, ChildStderr};
 use futures::AsyncWriteExt;
-use async_std::io::ReadExt;
+use std::fmt;
 
+#[derive(Debug)]
 pub struct Command {
     pub cmd: String,
     pub args: Vec<String>,
-    pub env: HashMap<String, String>
+    pub env: HashMap<String, String>,
+}
+
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {}", self.cmd, self.args.join(" "))
+    }
 }
 
 #[derive(Debug)]
 pub struct Subprocess {
     child: Child,
+    command: Command,
 }
 
 impl Subprocess {
@@ -25,12 +33,13 @@ impl Subprocess {
             .envs(&cmd.env)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()
             .context("Could not spawn subprocess")?;
 
         Ok(Self {
             child,
+            command: cmd,
         })
     }
 
@@ -40,8 +49,21 @@ impl Subprocess {
         Ok(status.code().unwrap())
     }
 
-    pub fn get_stdout(&mut self) -> &mut ChildStdout {
-        self.child.stdout.as_mut().unwrap()
+    pub fn take_stdout(&mut self) -> ChildStdout {
+        self.child.stdout.take().unwrap()
+    }
+
+    pub fn get_stderr(&mut self) -> &mut ChildStderr {
+        self.child.stderr.as_mut().unwrap()
+    }
+
+    pub fn close_stdin(&mut self) -> Result<()> {
+        self.child.stdin.take();
+        Ok(())
+    }
+
+    pub fn command_string(&self) -> String {
+        format!("{}", self.command)
     }
 
     pub async fn write_stdin(&mut self, s: &str) -> Result<()> {
@@ -51,22 +73,3 @@ impl Subprocess {
         Ok(())
     }
 }
-
-/*
-/// Makes a POSIX pipe with a non-blocking read end that will not be
-/// inherited by child processes, and a duplicated write end.
-fn output_pipe() -> Result<(File, (File, File))> {
-    use nix::fcntl::{fcntl, FcntlArg, OFlag};
-    use nix::unistd::pipe;
-    use nix::unistd::dup;
-    use std::os::unix::io::{AsRawFd, FromRawFd};
-
-    let (read, write) = pipe()?;
-    fcntl(read.as_raw_fd(), FcntlArg::F_SETFL(OFlag::O_NONBLOCK | OFlag::O_CLOEXEC))?;
-
-    let write_fds = (dup(write.as_raw_fd())?, write.as_raw_fd());
-    let write_files = unsafe { (File::from_raw_fd(write_fds.0), File::from_raw_fd(write_fds.1)) };
-
-    Ok((File::from(read), write_files))
-}
-*/

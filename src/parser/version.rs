@@ -14,7 +14,7 @@ pub fn version_spec(input: &str) -> VResult<VersionSpecification> {
     let (rest, (comparator, version)) = tuple((opt(comparator), version))(input)?;
     let spec = VersionSpecification { comparator, version };
 
-    return Ok((rest, spec))
+    Ok((rest, spec))
 }
 
 pub fn version(input: &str) -> VResult<Version> {

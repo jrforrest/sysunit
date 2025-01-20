@@ -7,13 +7,13 @@ use crate::models::StdoutData;
 use crate::parser::{StreamingResult, parse_stdout_data};
 
 /// Parses output from a unit into text lines and messages
-pub struct StdoutDataProducer<'a, R: AsyncRead + Unpin> {
-    read_fd: &'a mut R,
+pub struct StdoutDataProducer<R: AsyncRead + Unpin> {
+    read_fd: R,
     buf: String,
 }
 
-impl<'a, R: AsyncRead + Unpin> StdoutDataProducer<'a, R> {
-    pub fn new(read_fd: &'a mut R) -> Self {
+impl<R: AsyncRead + Unpin> StdoutDataProducer<R> {
+    pub fn new(read_fd: R) -> Self {
         Self { read_fd, buf: String::new() }
     }
     // Reads the next bit of data from stdout FD
@@ -23,12 +23,10 @@ impl<'a, R: AsyncRead + Unpin> StdoutDataProducer<'a, R> {
 
         let buf_len = self.buf.len();
         // first, fill the buf it is empty
-        if buf_len == 0 {
-            if !self.read_more().await? {
-                // buf is empty, pipe is closed, and we're not in the middle of parsing a
-                // message so we can exit normally.
-                return Ok(None);
-            }
+        if buf_len == 0 && !self.read_more().await? {
+            // buf is empty, pipe is closed, and we're not in the middle of parsing a
+            // message so we can exit normally.
+            return Ok(None);
         }
 
         loop {
@@ -66,5 +64,10 @@ impl<'a, R: AsyncRead + Unpin> StdoutDataProducer<'a, R> {
 
         self.buf.push_str(&as_str);
         Ok(true)
+    }
+
+    pub fn finalize(self) -> Result<()> {
+        drop(self); // Implicitly closes the read fd
+        Ok(())
     }
 }

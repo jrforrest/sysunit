@@ -13,7 +13,6 @@ enum State {
     Loading(ex_section::Ctx),
     ExecutionPlan,
     Running(ex_section::Ctx),
-    Error,
     Final
 }
 
@@ -26,7 +25,6 @@ impl Display for State {
             Loading(_) => "Loading",
             ExecutionPlan => "ExecutionPlan",
             Running(_) => "Running",
-            Error => "Error",
             Final => "Final",
         })
     }
@@ -59,7 +57,7 @@ impl Ctx {
             },
             (Final, E::Error(msg)) => {
                 self.out.ln(&format!("{}", "Error".red().bold()));
-                self.out.ln(&msg);
+                self.out.ln(msg);
             },
             (_, E::Debug(msg)) => {
                 if self.v >= V::Debug {
@@ -77,7 +75,7 @@ impl Ctx {
 
     fn ex_plan(&self, units: &Vec<UnitArc>) {
         for unit in units.iter() {
-            self.out.ln(&format!("{}", unit.name));
+            self.out.ln(&unit.name.to_string());
         }
     }
 

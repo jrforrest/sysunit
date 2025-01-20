@@ -1,8 +1,4 @@
-set -e -u
-
 exec 2>&1
-# Oh we should set $DEBUG to --debug and $VERBOSE to --verbose when appropriate
-# so we can use them in unit scripts to set verbosity of commands
 
 meta() : ;
 deps() : ;

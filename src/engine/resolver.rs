@@ -16,7 +16,7 @@ pub trait ResolvableNode: Clone + Eq + PartialEq + Hash + Debug + Display + Sync
 }
 
 pub trait DependencyFetcher<T: ResolvableNode> {
-    async fn get_node_dependencies(&self, node: T) -> Result<Vec<T>>;
+    async fn get_node_dependencies(&mut self, node: T) -> Result<Vec<T>>;
 }
 
 #[derive(Debug)]
@@ -41,7 +41,7 @@ enum NodeState {
 
 /// Resolves a dependency graph starting from the initial node.  Uses loader to lazily load
 /// dependencies as graph traversal proceeds.
-pub async fn resolve<'a, T, L>(initial_node: T, loader: &'a L) -> Result<Vec<T>> where
+pub async fn resolve<'a, T, L>(initial_node: T, loader: &'a mut L) -> Result<Vec<T>> where
     T: ResolvableNode + 'a,
     L: DependencyFetcher<T>,
 {
