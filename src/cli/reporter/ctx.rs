@@ -34,9 +34,3 @@ impl Out {
         println!("{:indent$}{}", "", s, indent = self.idt);
     }
 }
-
-enum Completion {
-    Pending,
-    Complete,
-    Unhandled,
-}

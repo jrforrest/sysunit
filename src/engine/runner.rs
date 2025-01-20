@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 use anyhow::{Result, anyhow};
 
 use crate::models::{Unit, UnitArc, Dependency, Meta, ValueSet};
-use crate::events::EventHandler;
 use super::unit_execution::UnitExecution;
 use super::Context as EngineContext;
 

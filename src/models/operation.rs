@@ -43,7 +43,7 @@ impl fmt::Display for Operation {
 #[derive(Debug, Clone)]
 pub enum OpStatus {
     Ok,
-    Failed(u8),
+    Failed,
 }
 
 impl OpStatus {
@@ -52,7 +52,7 @@ impl OpStatus {
             context(format!("Failed to parse emitted status code string: {}", code_str))?;
         match i {
             0 => Ok(OpStatus::Ok),
-            _ => Ok(OpStatus::Failed(i)),
+            _ => Ok(OpStatus::Failed),
         }
     }
 
@@ -73,16 +73,4 @@ pub enum OpCompletion {
     Remove(OpStatus, Arc<ValueSet>),
     Deps(OpStatus, Arc<Vec<Dependency>>),
     Meta(OpStatus, Arc<Meta>),
-}
-
-impl OpCompletion {
-    pub fn get_status(&self) -> &OpStatus {
-        match self {
-            OpCompletion::Check(status, _, _) => status,
-            OpCompletion::Apply(status, _) => status,
-            OpCompletion::Remove(status, _) => status,
-            OpCompletion::Deps(status, _) => status,
-            OpCompletion::Meta(status, _) => status,
-        }
-    }
 }

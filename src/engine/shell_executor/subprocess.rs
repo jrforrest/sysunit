@@ -1,11 +1,10 @@
 //! Async execution and communication with child processes
 use std::collections::HashMap;
 
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Result, Context};
 
 use async_process::{Command as AsyncCommand, Child, Stdio, ChildStdout};
 use futures::AsyncWriteExt;
-use async_std::io::ReadExt;
 
 pub struct Command {
     pub cmd: String,
@@ -51,22 +50,3 @@ impl Subprocess {
         Ok(())
     }
 }
-
-/*
-/// Makes a POSIX pipe with a non-blocking read end that will not be
-/// inherited by child processes, and a duplicated write end.
-fn output_pipe() -> Result<(File, (File, File))> {
-    use nix::fcntl::{fcntl, FcntlArg, OFlag};
-    use nix::unistd::pipe;
-    use nix::unistd::dup;
-    use std::os::unix::io::{AsRawFd, FromRawFd};
-
-    let (read, write) = pipe()?;
-    fcntl(read.as_raw_fd(), FcntlArg::F_SETFL(OFlag::O_NONBLOCK | OFlag::O_CLOEXEC))?;
-
-    let write_fds = (dup(write.as_raw_fd())?, write.as_raw_fd());
-    let write_files = unsafe { (File::from_raw_fd(write_fds.0), File::from_raw_fd(write_fds.1)) };
-
-    Ok((File::from(read), write_files))
-}
-*/

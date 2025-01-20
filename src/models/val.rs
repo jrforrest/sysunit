@@ -172,10 +172,6 @@ impl ValueSet {
         }
     }
 
-    pub fn contains_key(&self, name: &str) -> bool {
-        self.values.contains_key(name)
-    }
-
     /* Provides SHA1sum of all values combined */
     pub fn get_sig(&self) -> String {
         let mut all = String::new();

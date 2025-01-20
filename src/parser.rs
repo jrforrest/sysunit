@@ -23,13 +23,11 @@ use tracing::{instrument, event, Level};
 use self::{
     params::params,
     deps::deps,
-    version::{version, version_spec},
     value::value,
     target::target,
 };
 
 use crate::models::{Param, Dependency, Value, Target, StdoutData};
-use crate::models::version::{Version, VersionSpecification};
 
 use anyhow::{Result, anyhow};
 use common::ws;

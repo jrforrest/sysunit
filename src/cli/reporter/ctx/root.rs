@@ -13,7 +13,6 @@ enum State {
     Loading(ex_section::Ctx),
     ExecutionPlan,
     Running(ex_section::Ctx),
-    Error,
     Final
 }
 
@@ -26,7 +25,6 @@ impl Display for State {
             Loading(_) => "Loading",
             ExecutionPlan => "ExecutionPlan",
             Running(_) => "Running",
-            Error => "Error",
             Final => "Final",
         })
     }

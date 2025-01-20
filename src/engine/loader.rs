@@ -12,6 +12,7 @@ use unitfile::UnitFile;
 type NodeArc = Arc<Mutex<Node>>;
 type NodeResult = Result<Option<NodeArc>>;
 
+/// Finds and loads scripts from the set of search paths its instantiated with
 pub struct Loader {
     search_paths: Vec<NodeArc>,
 }
@@ -38,7 +39,7 @@ impl Loader {
         }
     }
 
-    pub async fn search(&self, loc: &str) -> NodeResult {
+    async fn search(&self, loc: &str) -> NodeResult {
         for node in &self.search_paths {
             let path = PathBuf::from(loc);
             if let Some(node) = self.search_node(node.clone(), &path).await? {
@@ -70,13 +71,15 @@ impl Loader {
     }
 }
 
+/// Loading is modeled as a graph traversal. A Node can be a directory which
+/// contains scripts and unitfiles, unitfiles, which contain scripts, and scripts
+/// which should be terminal nodes.
 #[derive(Debug)]
-pub enum Node {
+enum Node {
     Directory(Dir),
     UnitFile(UnitFile),
     Script(String),
 }
-
 
 impl Node {
     pub async fn search(&mut self, loc: &str) -> NodeResult {
