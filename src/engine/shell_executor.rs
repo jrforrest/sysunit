@@ -1,4 +1,4 @@
-//! Runs units via posix SH
+//! Runs units via posix sh
 
 use tracing::instrument;
 use anyhow::anyhow;
@@ -8,8 +8,6 @@ use crate::{
     models::{UnitArc, Operation, OpCompletion, ValueSet},
     events::{Event, OpEventHandler},
 };
-use crate::models::{Adapter, Command};
-use crate::engine::shell_executor::SHELL_OPTS;
 
 use super::Context as EngineContext;
 
@@ -22,8 +20,6 @@ use subprocess::Subprocess;
 use message_stream::MessageStream;
 
 const SHELL_SLUG: &str = include_str!("shell_slug.template.sh");
-
-const SHELL_OPTS: [&str; 3] = ["-e", "-x", "-u"];
 
 pub struct ShellExecutor {
     subprocess: Subprocess,
@@ -44,14 +40,7 @@ impl ShellExecutor {
         script: &str,
         ctx: EngineContext,
     ) -> Result<Self, anyhow::Error> {
-        let command = build_command(unit.clone())?;
-        if let Some(target) = unit.target {
-            if let Some(host) = target.host {
-                if host != "localhost" {
-                    // Your logic here
-                }
-            }
-        }
+        let command = build_command(unit.clone(), &ctx.opts)?;
         let subprocess = Subprocess::init(command)?;
 
         let mut executor = ShellExecutor {

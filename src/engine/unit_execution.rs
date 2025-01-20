@@ -9,7 +9,8 @@ use crate::models::{
     Operation,
     OpCompletion,
 };
-use crate::events::{EventHandler, OpEvent};
+use crate::events::OpEvent;
+use super::Context as EngineContext;
 use super::shell_executor::ShellExecutor;
 
 use std::sync::Arc;
@@ -33,7 +34,7 @@ use std::collections::HashMap;
 pub struct UnitExecution {
     unit: UnitArc,
     executor_state: ExecutorState,
-    ev_handler: EventHandler,
+    ctx: EngineContext,
     emit_data: Arc<ValueSet>,
     executed_operations: HashMap<Operation, OpCompletion>,
 }
@@ -54,12 +55,12 @@ impl fmt::Debug for UnitExecution {
 }
 
 impl UnitExecution {
-    pub async fn init(unit: UnitArc, ev_handler: EventHandler, script: &str) -> Result<UnitExecution> {
-        let executor = ShellExecutor::init(unit.clone(), script, ev_handler.clone()).await?;
+    pub async fn init(unit: UnitArc, ctx: EngineContext, script: &str) -> Result<UnitExecution> {
+        let executor = ShellExecutor::init(unit.clone(), script, ctx.clone()).await?;
 
         Ok(UnitExecution {
             unit,
-            ev_handler,
+            ctx,
             executed_operations: HashMap::new(),
             emit_data: ValueSet::new().into(),
             executor_state: ExecutorState::Running(executor),
@@ -79,7 +80,7 @@ impl UnitExecution {
             Entry::Vacant(entry) => {
                 event!(Level::INFO, "Running operation {} on unit {}", op, self.unit);
 
-                let op_ev_handler = self.ev_handler.get_op_handler(self.unit.clone(), op);
+                let op_ev_handler = self.ctx.ev_handler.get_op_handler(self.unit.clone(), op);
 
                 let operation_result = match self.executor_state {
                     ExecutorState::Finished => {

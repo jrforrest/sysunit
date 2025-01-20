@@ -13,12 +13,11 @@ mod runner;
 
 pub use resolver::ResolvableNode;
 
-use crate::models::{UnitArc, Operation, Adapter};
+use crate::models::{UnitArc, Operation};
 use crate::events::{Event, EventHandler, ObserverArc};
 
 use tracing::instrument;
-use std::fmt;
-use std::sync::Arc;
+use std::{fmt, sync::Arc, collections::HashMap};
 
 use loader::Loader;
 use resolver::resolve;
@@ -33,7 +32,7 @@ pub struct Opts {
     pub search_paths: Vec<PathBuf>,
     pub operation: Operation,
     pub unit: UnitArc,
-    pub adapters: Vec<Adapter>,
+    pub adapters: HashMap<String, String>,
 }
 
 #[derive(Clone)]

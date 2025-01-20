@@ -7,6 +7,7 @@ use anyhow::{Result, anyhow};
 use crate::models::{Unit, UnitArc, Dependency, Meta, ValueSet};
 use crate::events::EventHandler;
 use super::unit_execution::UnitExecution;
+use super::Context as EngineContext;
 
 use tracing::instrument;
 
@@ -14,7 +15,6 @@ use super::{
     loader::Loader,
     resolver::DependencyFetcher,
 };
-
 
 type ExecutionArc = Arc<Mutex<UnitExecution>>;
 type ExecutionMap = HashMap<UnitArc, ExecutionArc>;
@@ -27,7 +27,7 @@ type ExecutionMap = HashMap<UnitArc, ExecutionArc>;
 pub struct Runner {
     unit_executions: Arc<Mutex<ExecutionMap>>,
     loader: Loader,
-    ev_handler: EventHandler,
+    ctx: EngineContext,
 }
 
 /// Handles repetitve mutex boilerplate for the many functions that
@@ -46,9 +46,9 @@ macro_rules! run_ex {
 }
 
 impl Runner {
-    pub fn new(loader: Loader, ev_handler: EventHandler) -> Runner {
+    pub fn new(loader: Loader, ctx: EngineContext) -> Runner {
         Runner {
-            ev_handler,
+            ctx,
             loader,
             unit_executions: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -89,7 +89,7 @@ impl Runner {
 
         // If it's not present yet, create a new unit execution and add it to the map
         let script = self.loader.load(&unit.name).await?;
-        let mut execution = UnitExecution::init(unit.clone(), self.ev_handler.clone(), &script).await?;
+        let mut execution = UnitExecution::init(unit.clone(), self.ctx.clone(), &script).await?;
         let meta = execution.get_meta().await?;
         let args = self.build_args_for(unit.clone(), meta).await?;
         execution.set_args(args).await?;

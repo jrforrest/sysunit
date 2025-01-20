@@ -3,12 +3,14 @@
 
 use crate::{
     engine::Opts as EngineOpts,
-    models::{Operation, Unit, Value, ValueSet, Adapter},
+    models::{Operation, Unit, Value, ValueSet},
     parser::parse_target,
 };
 
 use anyhow::{anyhow, Result};
 use clap::{Arg, Command};
+
+use std::collections::HashMap;
 
 use async_std::path::PathBuf;
 
@@ -28,15 +30,15 @@ impl CLI {
         Ok(cli)
     }
 
-    fn get_adapters(&self) -> Result<Vec<Adapter>> {
-        let mut adapters = Vec::new();
+    fn get_adapters(&self) -> Result<HashMap<String, String>> {
+        let mut adapters = std::collections::HashMap::new();
 
         if let Some(adapter_str) = self.matches.get_one::<String>("adapter") {
             let parts: Vec<&str> = adapter_str.split('=').collect();
             if parts.len() != 2 {
                 return Err(anyhow!("Adapter must be in the form of PROTOCOL=COMMAND"));
             }
-            adapters.push(Adapter::new(parts[0].to_string(), parts[1].to_string()));
+            adapters.insert(parts[0].to_string(), parts[1].to_string());
         }
 
         Ok(adapters)

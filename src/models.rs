@@ -11,7 +11,7 @@ pub mod meta;
 pub mod target;
 pub mod stdout_data;
 
-pub use unit::{Unit, UnitArc, UnitDefinition};
+pub use unit::{Unit, UnitArc};
 pub use params::Param;
 pub use target::Target;
 pub use dep::{Dependency, CaptureDefinition};

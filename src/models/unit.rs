@@ -66,13 +66,3 @@ impl ResolvableNode for UnitArc {
 }
 
 use crate::engine::ResolvableNode;
-
-/// Definitions represent the combination of name and script from which units
-/// are instantiated.  Single-file units are loaded directly from the file system,
-/// so no UnitDefinition need be defined, but UnitFiles need a mapping of names to
-/// script.
-#[derive(Debug)]
-pub struct UnitDefinition {
-    pub name: String,
-    pub script: String
-}

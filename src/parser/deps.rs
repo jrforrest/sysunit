@@ -119,12 +119,13 @@ mod tests {
 
     #[test]
     fn test_target_tag() {
-        let input = "jack@localhost:";
+        let input = "ssh://jack@localhost:";
         let (rest, target) = target_tag(input).unwrap();
         let target = target.unwrap();
 
         assert_eq!(rest, "");
-        assert_eq!(&target.user, "jack");
+        assert_eq!(target.user, Some("jack".into()));
         assert_eq!(&target.host, "localhost");
+        assert_eq!(&target.proto, "ssh");
     }
 }
