@@ -61,7 +61,7 @@ impl fmt::Display for Unit {
 
 impl ResolvableNode for UnitArc {
     fn get_id(&self) -> String {
-        Unit::get_id(&self)
+        Unit::get_id(self)
     }
 }
 

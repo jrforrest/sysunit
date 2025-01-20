@@ -150,10 +150,7 @@ impl<'a, R: AsyncRead + Unpin> MessageStream<'a, R> {
             }
         }
 
-        let check_presence = match present {
-            Some(p) => p,
-            None => false,
-        };
+        let check_presence = present.unwrap_or_default();
 
         Ok(OpCompletion::Check(status, check_presence, Arc::new(vset)))
     }

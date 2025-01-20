@@ -23,12 +23,10 @@ impl<'a, R: AsyncRead + Unpin> StdoutDataProducer<'a, R> {
 
         let buf_len = self.buf.len();
         // first, fill the buf it is empty
-        if buf_len == 0 {
-            if !self.read_more().await? {
-                // buf is empty, pipe is closed, and we're not in the middle of parsing a
-                // message so we can exit normally.
-                return Ok(None);
-            }
+        if buf_len == 0 && !self.read_more().await? {
+            // buf is empty, pipe is closed, and we're not in the middle of parsing a
+            // message so we can exit normally.
+            return Ok(None);
         }
 
         loop {

@@ -92,7 +92,7 @@ impl Ctx {
                 }
             },
             (Output, OpE::Output(StdoutData::TextLine(o))) => {
-                self.out.ln(&o);
+                self.out.ln(o);
             },
             (EmitData, OpE::Output(StdoutData::Message(m))) => {
                 let header = match &m.header.field {
@@ -124,7 +124,7 @@ impl Ctx {
                     self.enter_state(State::Root)
                 }
 
-                let replay_evs = std::mem::replace(&mut self.diag_buf, Vec::new());
+                let replay_evs = std::mem::take(&mut self.diag_buf);
                 self.v = V::Verbose;
                 for op_ev in replay_evs {
                     self.handle_op_ev(op_ev.clone())

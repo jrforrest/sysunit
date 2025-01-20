@@ -46,7 +46,7 @@ impl Loader {
                 return Ok(Some(node));
             }
         }
-        return Ok(None);
+        Ok(None)
     }
 
     async fn search_node(&self, node: NodeArc, path: &PathBuf) -> NodeResult {
@@ -63,7 +63,7 @@ impl Loader {
                 }
             } else {
                 let lossy_component = component.to_string_lossy();
-                return Err(anyhow!("Could not parse component: {} in path: {}", lossy_component, display_path(&path)));
+                return Err(anyhow!("Could not parse component: {} in path: {}", lossy_component, display_path(path)));
             }
         }
 
@@ -138,7 +138,7 @@ impl Dir {
             }
         }
 
-        return Ok(None);
+        Ok(None)
     }
 }
 

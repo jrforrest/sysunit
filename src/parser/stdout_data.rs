@@ -42,7 +42,8 @@ fn header(input: &str) -> VResult<Header> {
 }
 
 fn header_text(input: &str) -> VResult<Header> {
-    let res = alt((
+    
+    alt((
         map(
             tuple((
                 header_label,
@@ -52,8 +53,7 @@ fn header_text(input: &str) -> VResult<Header> {
             |(name, _, field)| Header::build(name, Some(field)),
         ),
         map(header_label, |l| Header::build(l, None)),
-    ))(input);
-    res
+    ))(input)
 }
 
 fn message(input: &str) -> VResult<Message> {
@@ -78,7 +78,7 @@ pub fn stdout_data(input: &str) -> VResult<StdoutData> {
     alt((
         map(
             ws(message),
-            |msg| StdoutData::Message(msg)
+            StdoutData::Message
         ),
         map(text_line, |text| StdoutData::TextLine(text.to_string()))
     ))(input)

@@ -14,7 +14,7 @@ const SHELL_OPTS: [&str; 3] = ["-e", "-x", "-u"];
 pub fn build_command(unit: UnitArc, opts: &EngineOpts) -> Result<Command> {
     match unit.target {
         Some(ref target) => {
-            get_adapter(&opts, target)
+            get_adapter(opts, target)
         },
         None => Ok(Command {
             cmd: "/bin/sh".into(),
@@ -26,7 +26,7 @@ pub fn build_command(unit: UnitArc, opts: &EngineOpts) -> Result<Command> {
 
 fn get_adapter(opts: &EngineOpts, target: &Target) -> Result<Command> {
     if let Some(adapter_cmd) = opts.adapters.get(&target.proto) {
-        return Ok(Command {
+        Ok(Command {
             cmd: adapter_cmd.into(),
             args: vec![target.user_host_string()],
             env: HashMap::new(),

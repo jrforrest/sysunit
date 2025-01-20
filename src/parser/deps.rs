@@ -45,7 +45,7 @@ fn dep(input: &str) -> VResult<Dependency> {
         rest,
         Dependency {
             name: name.to_string(),
-            args: args.into(),
+            args,
             captures: captures.unwrap_or_default(),
             target,
         }
@@ -93,7 +93,7 @@ mod tests {
         assert_eq!(dep.captures.len(), 1);
         assert_eq!(dep.captures[0].name, "size");
         assert_eq!(dep.captures[0].value_type, ValueType::Int);
-        assert_eq!(dep.captures[0].required, false);
+        assert!(!dep.captures[0].required);
         assert_eq!(dep.captures[0].alias, Some("file_size".to_string()));
         assert_eq!(dep.target, None);
     }

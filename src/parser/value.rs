@@ -33,7 +33,7 @@ fn float(input: &str) -> VResult<Value> {
 
 fn bool(input: &str) -> VResult<Value> {
     let (rest, val) = alt((tag("true"), tag("false")))(input)?;
-    return Ok((rest, Value::Bool(val == "true")));
+    Ok((rest, Value::Bool(val == "true")))
 }
 
 pub fn value(input: &str) -> VResult<Value> {
@@ -92,7 +92,7 @@ mod tests {
         match bool(input).unwrap() {
             (rest, Value::Bool(parsed_bool)) => {
                 assert_eq!(rest, "");
-                assert_eq!(parsed_bool, true);
+                assert!(parsed_bool);
             },
             _ => panic!("unexpected Value type"),
         }
@@ -101,7 +101,7 @@ mod tests {
         match bool(input).unwrap() {
             (rest, Value::Bool(parsed_bool)) => {
                 assert_eq!(rest, "");
-                assert_eq!(parsed_bool, false);
+                assert!(!parsed_bool);
             },
             _ => panic!("unexpected Value type"),
         }

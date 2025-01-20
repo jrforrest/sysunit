@@ -10,9 +10,9 @@ pub struct Dependency {
     pub target: Option<Target>,
 }
 
-impl Into<Unit> for Dependency {
-    fn into(self) -> Unit {
-        Unit::new(self.name, self.args, self.target)
+impl From<Dependency> for Unit {
+    fn from(val: Dependency) -> Self {
+        Unit::new(val.name, val.args, val.target)
     }
 }
 

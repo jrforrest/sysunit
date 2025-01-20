@@ -27,10 +27,10 @@ impl Ctx {
         use State::*;
         match (&mut self.state, &e) {
             (Root, E::Op(unit, op, OpE::Started)) => {
-                self.enter_op(unit.clone(), op.clone())
+                self.enter_op(unit.clone(), *op)
             },
             (Op(ref mut op_ctx), E::Op(unit, op, _)) => {
-                if op_ctx.matches(&unit, op)  {
+                if op_ctx.matches(unit, op)  {
                     op_ctx.handle(e);
                 } else {
                     self.enter_state(Root);
