@@ -18,6 +18,7 @@ use crate::events::{Event, EventHandler, ObserverArc};
 
 use tracing::instrument;
 use std::fmt;
+use std::sync::Arc;
 
 use loader::Loader;
 use resolver::resolve;
@@ -25,7 +26,6 @@ use resolver::resolve;
 use anyhow::Result;
 use async_std::path::PathBuf;
 use runner::Runner;
-
 
 #[derive(Debug)]
 pub struct Opts {
@@ -36,10 +36,16 @@ pub struct Opts {
     pub adapters: Vec<Adapter>,
 }
 
+#[derive(Clone)]
+pub struct Context {
+    pub opts: Arc<Opts>,
+    pub ev_handler: EventHandler,
+}
+
 pub struct Engine {
     runner: Runner,
     ev_handler: EventHandler,
-    opts: Opts,
+    opts: Arc<Opts>,
 }
 
 // impl a brief debug representation of Engine
@@ -54,7 +60,12 @@ impl Engine {
     pub fn new(opts: Opts, observers: Vec<ObserverArc>) -> Engine {
         let loader = Loader::from_search_paths(opts.search_paths.clone());
         let ev_handler = EventHandler::new(observers);
-        let runner = Runner::new(loader, ev_handler.clone());
+        let opts = Arc::new(opts);
+        let ctx = Context {
+            opts: opts.clone(),
+            ev_handler: ev_handler.clone(),
+        };
+        let runner = Runner::new(loader, ctx);
 
         Engine {
             ev_handler,

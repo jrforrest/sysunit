@@ -3,7 +3,7 @@
 
 use crate::{
     engine::Opts as EngineOpts,
-    models::{Operation, Unit, Value, ValueSet},
+    models::{Operation, Unit, Value, ValueSet, Adapter},
     parser::parse_target,
 };
 
