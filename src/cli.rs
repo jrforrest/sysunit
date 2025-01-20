@@ -18,13 +18,6 @@ pub use reporter::{EngineLogger, Verbosity};
 
 pub struct CLI {
     matches: clap::ArgMatches,
-        .arg(
-            Arg::new("adapter")
-                .help("Specify protocol and command in the form of <protocol>=<command>")
-                .long("adapter")
-                .value_name("PROTOCOL=COMMAND")
-                .num_args(1),
-        )
 }
 
 impl CLI {
@@ -199,6 +192,13 @@ fn get_cli_definition() -> Command {
                 .short('a')
                 .action(clap::ArgAction::Append)
                 .value_name("KEY=VALUE")
+                .num_args(1),
+        )
+        .arg(
+            Arg::new("adapter")
+                .help("Specify protocol and command in the form of <protocol>=<command>")
+                .long("adapter")
+                .value_name("PROTOCOL=COMMAND")
                 .num_args(1),
         )
 }
