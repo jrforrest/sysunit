@@ -1,6 +1,8 @@
 //! Runs units via posix SH
 
 use tracing::instrument;
+use anyhow::anyhow;
+use crate::engine::shell_executor::adapter::build_command;
 use std::fmt;
 use crate::{
     models::{UnitArc, Operation, OpCompletion, ValueSet},
@@ -39,7 +41,7 @@ impl ShellExecutor {
         unit: UnitArc,
         script: &str,
         ctx: EngineContext,
-    ) -> Result<Self> {
+    ) -> Result<Self, anyhow::Error> {
         let command = build_command(unit.clone())?;
         let subprocess = Subprocess::init(command)?;
 
@@ -57,7 +59,7 @@ impl ShellExecutor {
     }
 
     /// Set arguments for the unit
-    pub async fn set_args(&mut self, args: ValueSet) -> Result<()> {
+    pub async fn set_args(&mut self, args: ValueSet) -> Result<(), anyhow::Error> {
         for (key, value) in args.values.iter() {
             self.send_stdin(&format!("{}=\"{}\"\n", key, value)).await?
         }
@@ -65,7 +67,7 @@ impl ShellExecutor {
     }
 
     /// Run an operation on the unit
-    pub async fn run_op(&mut self, op: Operation, op_ev_handler: OpEventHandler) -> Result<OpCompletion> {
+    pub async fn run_op(&mut self, op: Operation, op_ev_handler: OpEventHandler) -> Result<OpCompletion, anyhow::Error> {
         self.run_command(&op.to_string()).await?;
         let mut stdout_parser = stdout_data::StdoutDataProducer::new(self.subprocess.get_stdout());
         let mut message_stream = MessageStream::new(&mut stdout_parser, op_ev_handler.clone());
@@ -83,7 +85,7 @@ impl ShellExecutor {
 
     #[instrument]
     /// Close pipes to the unit and wait for it to exit
-    pub async fn finalize(self) -> Result<()> {
+    pub async fn finalize(self) -> Result<(), anyhow::Error> {
         let status_code = self.subprocess.finalize().await?;
 
         if status_code != 0 {
@@ -94,11 +96,11 @@ impl ShellExecutor {
         Ok(())
     }
 
-    async fn run_command(&mut self, command: &str) -> Result<()> {
+    async fn run_command(&mut self, command: &str) -> Result<(), anyhow::Error> {
         self.send_stdin(&format!("( {} )\n _emit status $? \n", command)).await
     }
 
-    async fn send_stdin(&mut self, data: &str) -> Result<()> {
+    async fn send_stdin(&mut self, data: &str) -> Result<(), anyhow::Error> {
         self.subprocess.write_stdin(data).await
     }
 }
