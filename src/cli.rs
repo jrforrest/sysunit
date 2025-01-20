@@ -28,6 +28,19 @@ impl CLI {
         Ok(cli)
     }
 
+    fn get_adapters(&self) -> Result<Vec<Adapter>> {
+        let mut adapters = Vec::new();
+
+        if let Some(adapter_str) = self.matches.get_one::<String>("adapter") {
+            let parts: Vec<&str> = adapter_str.split('=').collect();
+            if parts.len() != 2 {
+                return Err(anyhow!("Adapter must be in the form of PROTOCOL=COMMAND"));
+            }
+            adapters.push(Adapter::new(parts[0].to_string(), parts[1].to_string()));
+        }
+
+        Ok(adapters)
+
     fn get_verbosity_level(&self) -> Result<Verbosity> {
         let debug = self.matches.get_flag("debug");
         let verbose = self.matches.get_flag("verbose");
@@ -65,6 +78,7 @@ impl CLI {
                 .unwrap(),
             search_paths: self.get_search_paths()?,
             unit: self.get_unit()?.into(),
+            adapters: self.get_adapters()?,
         };
 
         let operation = engine_opts.operation;

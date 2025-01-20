@@ -13,7 +13,7 @@ mod runner;
 
 pub use resolver::ResolvableNode;
 
-use crate::models::{UnitArc, Operation};
+use crate::models::{UnitArc, Operation, Adapter};
 use crate::events::{Event, EventHandler, ObserverArc};
 
 use tracing::instrument;
@@ -33,7 +33,7 @@ pub struct Opts {
     pub search_paths: Vec<PathBuf>,
     pub operation: Operation,
     pub unit: UnitArc,
-}
+    pub adapters: Vec<Adapter>,
 
 pub struct Engine {
     runner: Runner,
