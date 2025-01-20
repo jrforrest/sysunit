@@ -4,17 +4,17 @@ use tracing::instrument;
 use std::fmt;
 use crate::{
     models::{UnitArc, Operation, OpCompletion, ValueSet},
-    events::{Event, EventHandler, OpEventHandler},
+    events::{Event, OpEventHandler},
 };
 
-use std::collections::HashMap;
-use anyhow::{Result, anyhow};
+use super::Context as EngineContext;
 
 mod subprocess;
 mod stdout_data;
 mod message_stream;
+mod adapter;
 
-use subprocess::{Command, Subprocess};
+use subprocess::Subprocess;
 use message_stream::MessageStream;
 
 const SHELL_SLUG: &str = include_str!("shell_slug.template.sh");
@@ -24,7 +24,7 @@ const SHELL_OPTS: [&str; 3] = ["-e", "-x", "-u"];
 pub struct ShellExecutor {
     subprocess: Subprocess,
     unit: UnitArc,
-    ev_handler: EventHandler,
+    ctx: EngineContext,
 }
 
 impl fmt::Debug for ShellExecutor {
@@ -38,14 +38,14 @@ impl ShellExecutor {
     pub async fn init(
         unit: UnitArc,
         script: &str,
-        ev_handler: EventHandler,
+        ctx: EngineContext,
     ) -> Result<Self> {
         let command = build_command(unit.clone())?;
         let subprocess = Subprocess::init(command)?;
 
         let mut executor = ShellExecutor {
             subprocess,
-            ev_handler,
+            ctx,
             unit: unit.clone(),
         };
 
@@ -90,7 +90,7 @@ impl ShellExecutor {
             return Err(anyhow!("Shell script for unit {} exited with status code {}", self.unit.name, status_code));
         }
 
-        self.ev_handler.handle(Event::Debug(format!("Script {} exited", self.unit.name)))?;
+        self.ctx.ev_handler.handle(Event::Debug(format!("Script {} exited", self.unit.name)))?;
         Ok(())
     }
 
@@ -101,27 +101,4 @@ impl ShellExecutor {
     async fn send_stdin(&mut self, data: &str) -> Result<()> {
         self.subprocess.write_stdin(data).await
     }
-}
-
-fn build_command(unit: UnitArc) -> Result<Command> {
-    let command = match unit.target {
-        Some(ref target) => {
-            if target.host != "localhost" {
-                return Err(anyhow!("Can't run on target: {}.  Remote targets not supported yet", target));
-            }
-
-            Command {
-                cmd: "su".into(),
-                args: vec!["-".into(), target.user.clone(), "-c".into(), "/bin/sh".into()],
-                env: HashMap::new(),
-            }
-        },
-        None => Command {
-            cmd: "/bin/sh".into(),
-            args: SHELL_OPTS.iter().map(|s| s.to_string()).collect(),
-            env: HashMap::new(),
-        }
-    };
-
-    Ok(command)
 }
