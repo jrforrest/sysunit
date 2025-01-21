@@ -87,7 +87,6 @@ impl UnitExecution {
                         panic!("Can't run operation {}:{}, executor has already exited!", self.unit, op)
                     },
 
-
                     ExecutorState::Running(ref mut executor) => {
                         op_ev_handler.handle(OpEvent::Started)?;
                         executor.run_op(op, op_ev_handler.clone()).await

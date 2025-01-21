@@ -47,7 +47,6 @@ pub struct Engine {
     opts: Arc<Opts>,
 }
 
-// impl a brief debug representation of Engine
 impl fmt::Debug for Engine {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Engine {{ opts: {:?} }}", self.opts)?;
