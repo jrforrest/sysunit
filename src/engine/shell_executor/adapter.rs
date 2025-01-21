@@ -38,13 +38,13 @@ fn get_adapter(opts: &EngineOpts, target: &Target) -> Result<Command> {
             env: HashMap::new(),
         })
     } else if target.proto == "podman" {
-        let mut args = vec!["run".into(), "-it".into()];
+        let mut args = vec!["exec".into(), "-it".into()];
         if let Some(user) = &target.user {
             args.push("--user".into());
             args.push(user.clone())
         }
-        args.push("--name".into());
         args.push(target.host.clone());
+        args.push("/bin/sh".into());
 
         return Ok(Command {
             cmd: "podman".into(),

@@ -97,7 +97,9 @@ impl Engine {
 
         self.ev_handler.handle(finalization_event)?;
 
-        result
+        // Any errors have been sent to the event handler for display, so we can
+        // return OK upstream
+        Ok(())
     }
 
     async fn run_with_dependencies(&mut self, unit: UnitArc, op: Operation) -> Result<()> {

@@ -3,9 +3,10 @@ use std::collections::HashMap;
 
 use anyhow::{Result, Context};
 
-use async_process::{Command as AsyncCommand, Child, Stdio, ChildStdout};
+use async_process::{Command as AsyncCommand, Child, Stdio, ChildStdout, ChildStderr};
 use futures::AsyncWriteExt;
 
+#[derive(Debug)]
 pub struct Command {
     pub cmd: String,
     pub args: Vec<String>,
@@ -24,7 +25,7 @@ impl Subprocess {
             .envs(&cmd.env)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()
             .context("Could not spawn subprocess")?;
 
@@ -41,6 +42,10 @@ impl Subprocess {
 
     pub fn get_stdout(&mut self) -> &mut ChildStdout {
         self.child.stdout.as_mut().unwrap()
+    }
+
+    pub fn get_stderr(&mut self) -> &mut ChildStderr {
+        self.child.stderr.as_mut().unwrap()
     }
 
     pub async fn write_stdin(&mut self, s: &str) -> Result<()> {

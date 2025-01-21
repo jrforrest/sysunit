@@ -83,11 +83,15 @@ impl ShellExecutor {
 
     #[instrument]
     /// Close pipes to the unit and wait for it to exit
-    pub async fn finalize(self) -> Result<(), anyhow::Error> {
+    pub async fn finalize(mut self) -> Result<(), anyhow::Error> {
+        use async_std::io::ReadExt;
+        let mut stderr = String::new();
+        self.subprocess.get_stderr().read_to_string(&mut stderr).await?;
+
         let status_code = self.subprocess.finalize().await?;
 
         if status_code != 0 {
-            return Err(anyhow!("Shell script for unit {} exited with status code {}", self.unit.name, status_code));
+            return Err(anyhow!("adapter exited with status code {} {}", status_code, stderr));
         }
 
         self.ctx.ev_handler.handle(Event::Debug(format!("Script {} exited", self.unit.name)))?;
