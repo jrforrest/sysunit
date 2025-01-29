@@ -13,7 +13,7 @@ pub mod stdout_data;
 
 pub use unit::{Unit, UnitArc};
 pub use params::Param;
-pub use target::Target;
+pub use target::{Target, TargetArc};
 pub use dep::{Dependency, CaptureDefinition};
 pub use val::{Value, ValueSet, ValueType};
 pub use emit::Message as EmitMessage;

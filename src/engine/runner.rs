@@ -4,9 +4,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use anyhow::{Result, anyhow};
 
-use crate::models::{Unit, UnitArc, Dependency, Meta, ValueSet};
+use crate::models::{Operation, OpCompletion, Unit, UnitArc, Dependency, Meta, ValueSet, Target};
 use super::unit_execution::UnitExecution;
 use super::Context as EngineContext;
+use super::shell_executor::{ShellExecutor, ExecutorArc};
 
 use tracing::instrument;
 
@@ -15,33 +16,11 @@ use super::{
     resolver::DependencyFetcher,
 };
 
-type ExecutionArc = Arc<Mutex<UnitExecution>>;
-type ExecutionMap = HashMap<UnitArc, ExecutionArc>;
-
-/// Provides an atomic reference counted, interior mutable interface for managing the
-/// execution of units.  It contains state of individual unit executions behind a mutex
-/// internally, so it can be called from async tasks safely.  Individual unit unit_executions
-/// are behind their own mutexes as well, so running an operation on one unit should not block
-/// another.
 pub struct Runner {
-    unit_executions: Arc<Mutex<ExecutionMap>>,
-    loader: Loader,
     ctx: EngineContext,
-}
-
-/// Handles repetitve mutex boilerplate for the many functions that
-/// need to lock unit executions below
-macro_rules! run_ex {
-    ($self:ident, $unit:ident, $op:ident) => {
-        {
-            let ex_arc = $self.get_unit_execution($unit.clone())
-                .await
-                .map_err(|e| e.context(format!("Failed to run unit {}", $unit.name)))
-                ?;
-            let mut unit_execution = ex_arc.lock().unwrap();
-            unit_execution.$op().await
-        }
-    }
+    loader: Loader,
+    unit_executions: HashMap<UnitArc, UnitExecution>,
+    executors: HashMap<Target, ExecutorArc>,
 }
 
 impl Runner {
@@ -49,56 +28,101 @@ impl Runner {
         Runner {
             ctx,
             loader,
-            unit_executions: Arc::new(Mutex::new(HashMap::new())),
+            unit_executions: HashMap::new(),
+            executors: HashMap::new(),
         }
     }
 
-    pub async fn get_deps(&self, unit: UnitArc) -> Result<Arc<Vec<Dependency>>> {
-        run_ex!(self, unit, get_deps)
+    pub async fn get_meta(&mut self, unit: UnitArc) -> Result<Arc<Meta>> {
+        let mut executor = self.get_executor(unit.clone()).await?;
+        let result = executor.run_op(&unit.name, &ValueSet::new(), Operation::Meta).await?;
+        match result {
+            OpCompletion::Meta(status, meta) => {
+                status.expect_ok()?;
+                Ok(meta)
+            },
+            _ => panic!("Expected Meta operation to return Meta result"),
+        }
     }
 
-    pub async fn check(&self, unit: UnitArc) -> Result<bool> {
-        run_ex!(self, unit, check)
+    pub async fn get_deps(&self, unit: UnitArc) -> Result<Result<Arc<Vec<Dependency>>>> {
+        match self.run_op(unit, Operation::Deps).await? {
+            OpCompletion::Deps(status, deps) => {
+                status.expect_ok()?;
+                execution.set_deps(deps);
+                Ok(())
+            },
+            _ => panic!("Expected Deps operation to return Deps result"),
+        }
     }
 
-    pub async fn apply(&self, unit: UnitArc) -> Result<()> {
-        run_ex!(self, unit, apply)
+    pub async fn remove(&mut self, unit: UnitArc) -> Result<()> {
+        let mut execution = self.get_unit_execution(unit.clone()).await?;
+        let mut executor = self.get_executor(unit.clone()).await?;
+        let result = executor.run_op(&execution.script, &execution.args, Operation::Remove).await?;
+        match result {
+            OpCompletion::Remove(status, emit_data) => {
+                status.expect_ok()?;
+                execution.add_emit_data(emit_data);
+                Ok(())
+            },
+            _ => panic!("Expected Remove operation to return Remove result"),
+        }
     }
 
-    pub async fn remove(&self, unit: UnitArc) -> Result<()> {
-        run_ex!(self, unit, remove)
+    pub async fn apply(&mut self, unit: UnitArc) -> Result<()> {
+        let mut execution = self.get_unit_execution(unit.clone()).await?;
+        let mut executor = self.get_executor(unit.clone()).await?;
+        let result = executor.run_op(&execution.script, &execution.args, Operation::Apply).await?;
+        match result {
+            OpCompletion::Apply(status, emit_data) => {
+                status.expect_ok()?;
+                execution.add_emit_data(emit_data);
+                Ok(())
+            },
+            _ => panic!("Expected Apply operation to return Apply result"),
+        }
     }
 
-    pub async fn finalize(&self, unit: UnitArc) -> Result<()> {
-        run_ex!(self, unit, finalize)
+    pub async fn check(&mut self, unit: UnitArc) -> Result<bool> {
+        match self.run_op(unit, Operation::Check).await? {
+            OpCompletion::Check(status, check_presence, emit_data) => {
+                status.expect_ok()?;
+                execution.add_emit_data(emit_data);
+                Ok(check_presence)
+            },
+            _ => panic!("Expected Check operation to return Check result"),
+        }
     }
 
-    async fn get_emit_data(&self, unit: UnitArc) -> Result<Arc<ValueSet>> {
-        run_ex!(self, unit, get_emit_data)
+    pub async fn run_op(&mut self, unit: UnitArc, op: Operation) -> Result<OpCompletion> {
+        let mut execution = self.get_unit_execution(unit.clone()).await?;
+        let mut executor = self.get_executor(unit.clone()).await?;
+        let result = executor.run_op(&execution.script, &execution.args, op).await?;
+        result.expect_ok()?;
+        Ok(result)
     }
 
-    async fn get_unit_execution(&self, unit: UnitArc) -> Result<ExecutionArc> {
-        // Return the existing unit execution if it's already present in the unit executions map
-        {
-            let existing_units = self.unit_executions.lock().unwrap();
-            if let Some(executor) = existing_units.get(&unit) {
-                return Ok(executor.clone());
+    async fn get_unit_execution(&mut self, unit: UnitArc) -> &mut UnitExecution {
+        match self.unit_executions.get_mut(&unit) {
+            Some(execution) => Ok(execution),
+            None => {
+                panic!("Unit not initialized: {:?}", unit);
             }
         }
+    }
 
-        // If it's not present yet, create a new unit execution and add it to the map
-        let script = self.loader.load(&unit.name).await?;
-        let mut execution = UnitExecution::init(unit.clone(), self.ctx.clone(), &script).await?;
-        let meta = execution.get_meta().await?;
-        let args = self.build_args_for(unit.clone(), meta).await?;
-        execution.set_args(args).await?;
-
-        let arc = Arc::new(Mutex::new(execution));
-
-        let mut unit_executions = self.unit_executions.lock().unwrap();
-        unit_executions.insert(unit.clone(), arc.clone());
-
-        Ok(arc)
+    async fn get_executor(&mut self, unit: UnitArc) -> Result<ExecutorArc> {
+        let default_target = Some(Target::default());
+        let target = unit.target.as_ref().or(default_target.as_ref()).unwrap();
+        match self.executors.get(&target).cloned() {
+            Some(exarc) => Ok(exarc),
+            None => {
+                let exarc = Arc::new(Mutex::new(ShellExecutor::init(&target, self.ctx.clone()).await?));
+                self.executors.insert(target.clone(), exarc.clone());
+                Ok(exarc)
+            }
+        }
     }
 
     // A unit first needs to have arguments injected.  Then before running check/apply, it

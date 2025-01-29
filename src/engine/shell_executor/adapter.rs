@@ -5,26 +5,13 @@ use anyhow::{Result, anyhow};
 use super::subprocess::Command;
 use crate::engine::Opts as EngineOpts;
 
-use crate::models::{Target, UnitArc};
+use crate::models::Target;
 
 const SHELL_OPTS: [&str; 3] = ["-e", "-x", "-u"];
 
 /// Builds the command that will run a unit based on the adapter configured
 /// for its target
-pub fn build_command(unit: UnitArc, opts: &EngineOpts) -> Result<Command> {
-    match unit.target {
-        Some(ref target) => {
-            get_adapter(opts, target)
-        },
-        None => Ok(Command {
-            cmd: "/bin/sh".into(),
-            args: SHELL_OPTS.iter().map(|s| s.to_string()).collect(),
-            env: HashMap::new(),
-        })
-    }
-}
-
-fn get_adapter(opts: &EngineOpts, target: &Target) -> Result<Command> {
+pub fn build_command(target: &Target, opts: &EngineOpts) -> Result<Command> {
     if let Some(adapter_cmd) = opts.adapters.get(&target.proto) {
         Ok(Command {
             cmd: adapter_cmd.into(),
@@ -35,6 +22,15 @@ fn get_adapter(opts: &EngineOpts, target: &Target) -> Result<Command> {
         return Ok(Command {
             cmd: "ssh".into(),
             args: vec![target.user_host_string()],
+            env: HashMap::new(),
+        })
+    } else if target.proto == "local" {
+        if target.host != "localhost" {
+            return Err(anyhow!("Local target must have host 'localhost'"))
+        }
+        return Ok(Command {
+            cmd: "/bin/sh".into(),
+            args: SHELL_OPTS.iter().map(|s| s.to_string()).collect(),
             env: HashMap::new(),
         })
     } else if target.proto == "podman" {

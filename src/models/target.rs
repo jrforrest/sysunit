@@ -1,11 +1,14 @@
 use std::fmt;
+use std::sync::Arc;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Target {
     pub proto: String,
     pub user: Option<String>,
     pub host: String,
 }
+
+pub type TargetArc = Arc<Target>;
 
 impl Target {
     pub fn new(proto: &str, user: Option<&str>, host: &str) -> Self {
@@ -13,6 +16,14 @@ impl Target {
             proto: proto.to_string(),
             user: user.map(|u| u.to_string()),
             host: host.to_string(),
+        }
+    }
+
+    pub fn default() -> Self {
+        Self {
+            proto: "local".to_string(),
+            user: None,
+            host: "localhost".to_string(),
         }
     }
 
