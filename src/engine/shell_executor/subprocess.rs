@@ -40,8 +40,8 @@ impl Subprocess {
         Ok(status.code().unwrap())
     }
 
-    pub fn get_stdout(&mut self) -> &mut ChildStdout {
-        self.child.stdout.as_mut().unwrap()
+    pub fn take_stdout(&mut self) -> ChildStdout {
+        self.child.stdout.take().unwrap()
     }
 
     pub fn get_stderr(&mut self) -> &mut ChildStderr {

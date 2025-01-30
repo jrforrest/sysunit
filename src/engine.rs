@@ -10,6 +10,7 @@ mod resolver;
 mod unit_execution;
 mod shell_executor;
 mod runner;
+mod executor_pool;
 
 pub use resolver::ResolvableNode;
 
@@ -89,6 +90,8 @@ impl Engine {
             _ => panic!("Operation {:?} can't be run directly", op),
         };
 
+        self.runner.finalize().await?;
+
         let finalization_event = match result {
             Ok(_) => Event::EngineSuccess,
             Err(ref e) => Event::Error(format!("{:#}", e)),
@@ -104,7 +107,7 @@ impl Engine {
     async fn run_with_dependencies(&mut self, unit: UnitArc, op: Operation) -> Result<()> {
         self.ev_handler.handle(Event::Resolving)?;
 
-        let ordered_units = resolve(unit, &self.runner).await?;
+        let ordered_units = resolve(unit, &mut self.runner).await?;
 
         self.ev_handler.handle(Event::Resolved(ordered_units.clone()))?;
 
@@ -117,9 +120,7 @@ impl Engine {
 
     #[instrument]
     async fn run_unit(&mut self, unit: UnitArc, op: Operation) -> Result<()> {
-        self.runner.set_captures(unit.clone()).await?;
-
-        async fn do_op(runner: &Runner, unit: UnitArc, op: Operation) -> Result<()> {
+        async fn do_op(runner: &mut Runner, unit: UnitArc, op: Operation) -> Result<()> {
             match op {
                 Operation::Check => {
                     runner.check(unit).await?;
@@ -140,8 +141,7 @@ impl Engine {
             Ok(())
         }
 
-        let result = do_op(&self.runner, unit.clone(), op).await;
-        self.runner.finalize(unit.clone()).await?;
+        let result = do_op(&mut self.runner, unit.clone(), op).await;
         return result;
     }
 }

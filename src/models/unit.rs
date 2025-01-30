@@ -20,11 +20,11 @@ pub struct Unit {
     pub name: String,
     /// The arguments provided for the unit's invocation
     pub args: ValueSet,
-    pub target: Option<Target>,
+    pub target: Target,
 }
 
 impl Unit {
-    pub fn new(name: String, args: ValueSet, target: Option<Target> ) -> Unit {
+    pub fn new(name: String, args: ValueSet, target: Target ) -> Unit {
         Unit { name, args, target }
     }
 

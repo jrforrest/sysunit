@@ -7,13 +7,13 @@ use crate::models::StdoutData;
 use crate::parser::{StreamingResult, parse_stdout_data};
 
 /// Parses output from a unit into text lines and messages
-pub struct StdoutDataProducer<'a, R: AsyncRead + Unpin> {
-    read_fd: &'a mut R,
+pub struct StdoutDataProducer<R: AsyncRead + Unpin> {
+    read_fd: R,
     buf: String,
 }
 
-impl<'a, R: AsyncRead + Unpin> StdoutDataProducer<'a, R> {
-    pub fn new(read_fd: &'a mut R) -> Self {
+impl<R: AsyncRead + Unpin> StdoutDataProducer<R> {
+    pub fn new(read_fd: R) -> Self {
         Self { read_fd, buf: String::new() }
     }
     // Reads the next bit of data from stdout FD

@@ -3,7 +3,7 @@
 
 use crate::{
     engine::Opts as EngineOpts,
-    models::{Operation, Unit, Value, ValueSet},
+    models::{Operation, Unit, Value, ValueSet, Target},
     parser::parse_target,
 };
 
@@ -117,8 +117,8 @@ impl CLI {
         }
 
         let target = match matches.get_one::<String>("target") {
-            Some(t) => Some(parse_target(t)?),
-            None => None,
+            Some(t) => parse_target(t)?,
+            None => Target::default(),
         };
 
         Ok(Unit::new(unit_name.to_string(), arg_set, target))

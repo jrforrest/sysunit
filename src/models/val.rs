@@ -9,7 +9,7 @@ use std::fmt;
 use std::collections::HashMap;
 
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Clone)]
 pub enum ValueType {
     String,
     Int,

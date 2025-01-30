@@ -3,11 +3,12 @@
 use anyhow::{anyhow, Result};
 use crate::engine::shell_executor::adapter::build_command;
 use crate::{
-    models::{Target, Operation, OpCompletion, ValueSet},
+    models::{Target, Operation, ValueSet, Dependency, Meta},
     events::{Event, OpEventHandler},
 };
 
 use std::sync::{Arc, Mutex};
+use async_process::ChildStdout;
 
 use super::Context as EngineContext;
 
@@ -21,12 +22,11 @@ use message_stream::MessageStream;
 
 const SHELL_SLUG: &str = include_str!("shell_slug.template.sh");
 
-pub type ExecutorArc = Arc<Mutex<ShellExecutor>>;
-
 /// Executes a unit's shell script and provides an interface to interract with it
 pub struct ShellExecutor {
     subprocess: Subprocess,
     ctx: EngineContext,
+    msg_stream: MessageStream<ChildStdout>,
 }
 
 impl ShellExecutor {
@@ -35,11 +35,14 @@ impl ShellExecutor {
         ctx: EngineContext,
     ) -> Result<Self> {
         let command = build_command(target, &ctx.opts)?;
-        let subprocess = Subprocess::init(command)?;
+        let mut subprocess = Subprocess::init(command)?;
+        let stdout_parser = stdout_data::StdoutDataProducer::new(subprocess.take_stdout());
+        let msg_stream = MessageStream::new(stdout_parser);
 
         let mut executor = ShellExecutor {
             subprocess,
             ctx,
+            msg_stream,
         };
 
         executor.send_stdin(SHELL_SLUG).await?;
@@ -47,23 +50,35 @@ impl ShellExecutor {
         Ok(executor)
     }
 
+    pub async fn get_meta(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<Meta> {
+        self.run_op(Operation::Meta, script, args).await?;
+        self.msg_stream.get_meta(op_ev_handler).await
+    }
+    pub async fn get_deps(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<Vec<Dependency>> {
+        self.run_op(Operation::Deps, script, args).await?;
+        self.msg_stream.get_deps(op_ev_handler).await
+    }
+
+    pub async fn check(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<(bool, ValueSet)> {
+        self.run_op(Operation::Check, script, args).await?;
+        self.msg_stream.get_check_values(op_ev_handler).await
+    }
+
+    pub async fn apply(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<ValueSet> {
+        self.run_op(Operation::Apply, script, args).await?;
+        self.msg_stream.get_apply_values(op_ev_handler).await
+    }
+
+    pub async fn remove(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<ValueSet> {
+        self.run_op(Operation::Remove, script, args).await?;
+        self.msg_stream.get_remove_values(op_ev_handler).await
+    }
 
     /// Runs an operation from the given script
-    pub async fn run_op(&mut self, op: Operation, op_ev_handler: OpEventHandler, script: &str, args: Arc<Mutex<ValueSet>>) -> Result<OpCompletion> {
+    async fn run_op(&mut self, op: Operation, script: &str, args: &ValueSet) -> Result<()> {
         let argstr = args_str(args);
         self.send_stdin(&format!("(\n{}\n{}\n{}\n)\n _emit status $? \n", script, argstr, op.to_string())).await?;
-        let mut stdout_parser = stdout_data::StdoutDataProducer::new(self.subprocess.get_stdout());
-        let mut message_stream = MessageStream::new(&mut stdout_parser, op_ev_handler.clone());
-
-        let opc = match op {
-            Operation::Meta => message_stream.get_meta().await,
-            Operation::Deps => message_stream.get_deps().await,
-            Operation::Check => message_stream.get_check_values().await,
-            Operation::Apply => message_stream.get_apply_values().await,
-            Operation::Remove => message_stream.get_remove_values().await,
-        }?;
-
-        Ok(opc)
+        Ok(())
     }
 
     /// Close pipes to the shell subprocess and wait for it to exit
@@ -88,8 +103,7 @@ impl ShellExecutor {
     }
 }
 
-fn args_str(args: Arc<Mutex<ValueSet>>) -> String {
-    let args = args.lock().unwrap();
+fn args_str(args: &ValueSet) -> String {
     let mut argstr = String::new();
     for (key, value) in args.values.iter() {
         argstr.push_str(&format!("{}=\"{}\"\n", key, value));

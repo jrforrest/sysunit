@@ -74,3 +74,16 @@ pub enum OpCompletion {
     Deps(OpStatus, Arc<Vec<Dependency>>),
     Meta(OpStatus, Arc<Meta>),
 }
+
+impl OpCompletion {
+    pub fn expect_ok(&self) -> Result<()> {
+        match self {
+            OpCompletion::Check(status, _, _) => status.expect_ok(),
+            OpCompletion::Apply(status, _) => status.expect_ok(),
+            OpCompletion::Remove(status, _) => status.expect_ok(),
+            OpCompletion::Deps(status, _) => status.expect_ok(),
+            OpCompletion::Meta(status, _) => status.expect_ok(),
+        }
+    }
+}
+
