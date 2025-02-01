@@ -134,6 +134,12 @@ supplied to each dependent.  Circular dependencies are not permitted.
 
 ### Unit Execution
 
+Units are run in a subshell, and their output is captured.  The unit's output is displayed to the user
+in the case of a failure.  The unit's output is not displayed in the case of success, unless the
+`--debug` flag is passed.
+
+Only one shell process is spawned per target.
+
 ## License
 
-This project is licensed under the GNU Affero General Public License (AGPL) v3.0. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU Affero General Public License (AGPL) v3.0. See the [LICENSE](LICENSE.txt) file for details.
