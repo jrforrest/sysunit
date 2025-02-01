@@ -55,7 +55,12 @@ provides hooks for the various stages of execution.
 ```sh
 # foo_file.sh
 
-check() [ -f /etc/foo.conf ] && emit_ok;
+check() {
+    if [ -f /etc/foo.conf ]; then
+        present
+    fi
+}
+
 apply() touch /etc/foo.conf;
 remove() rm /etc/foo.conf;
 ```
@@ -81,7 +86,7 @@ meta() {
 
 deps() {
     dep 'pkg.sh name="python"'
-    dep 'dir.sh path="./tmp/"
+    dep 'dir.sh path="./tmp/"'
     # curl.sh emits the path to the installed curl binary, which we require
     # and capture here.
     dep 'curl.sh -> !binary_path:curl_binary_path:string'
