@@ -1,5 +1,4 @@
 use super::*;
-use super::ex_section;
 use crate::models::UnitArc;
 
 pub struct Ctx {
@@ -10,7 +9,7 @@ pub struct Ctx {
 
 enum State {
     Root,
-    Loading(ex_section::Ctx),
+    Loading(load::Ctx),
     ExecutionPlan,
     Running(ex_section::Ctx),
     Final
@@ -40,7 +39,8 @@ impl Ctx {
         match (&mut self.state, &ev) {
             (Root, E::Resolving) => self.enter_load(),
             (Loading(ctx), E::Op(..)) => ctx.handle(ev),
-            (Loading(..), E::Resolved(units)) => {
+            (Loading(load_ctx), E::Resolved(units)) => {
+                load_ctx.report_ok();
                 self.out.dedent();
                 self.enter_state(ExecutionPlan);
                 self.ex_plan(units);
@@ -74,8 +74,12 @@ impl Ctx {
     }
 
     fn ex_plan(&self, units: &Vec<UnitArc>) {
-        for unit in units.iter() {
-            self.out.ln(&unit.name.to_string());
+        fn unit_str(unit: &UnitArc) -> String {
+            format!("{}@{}", unit.tag(), unit.target)
+        }
+
+        for (i, unit) in units.iter().enumerate() {
+            self.out.ln(&format!("{}. {}", i + 1, unit_str(&unit)));
         }
     }
 
@@ -92,16 +96,16 @@ impl Ctx {
     }
 
     fn enter_running(&mut self) {
-        self.enter_state(State::Running(self.ex_context()));
+        let mut out = self.out.clone();
+        out.indent();
+        let ctx = ex_section::Ctx::new(self.v.clone(), out);
+        self.enter_state(State::Running(ctx));
     }
 
     fn enter_load(&mut self) {
-        self.enter_state(State::Loading(self.ex_context()));
-    }
-
-    fn ex_context(&self) -> ex_section::Ctx {
         let mut out = self.out.clone();
         out.indent();
-        ex_section::Ctx::new(self.v.clone(), out)
+        let ctx = load::Ctx::new(self.v.clone(), out);
+        self.enter_state(State::Loading(ctx));
     }
 }

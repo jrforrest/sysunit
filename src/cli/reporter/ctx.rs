@@ -5,6 +5,7 @@ use colored::*;
 mod root;
 mod ex_section;
 mod op;
+mod load;
 
 pub use root::Ctx as RootContext;
 
@@ -32,5 +33,11 @@ impl Out {
 
     fn ln(&self, s: &str) {
         println!("{:indent$}{}", "", s, indent = self.idt);
+    }
+
+    fn indent_all(&self, s: &str) {
+        for line in s.lines() {
+            println!("{:indent$}{}", "", line, indent = self.idt);
+        }
     }
 }

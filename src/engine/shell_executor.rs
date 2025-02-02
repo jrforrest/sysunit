@@ -52,76 +52,52 @@ impl ShellExecutor {
     pub async fn get_meta(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<Meta> {
         op_ev_handler.handle(OpEvent::Started)?;
         self.run_op(Operation::Meta, script, args).await?;
-        match self.msg_stream.get_meta(op_ev_handler.clone()).await {
-            Ok(meta) => {
+        self.msg_stream.get_meta(op_ev_handler.clone()).await
+            .and_then(|meta| {
                 op_ev_handler.handle(OpEvent::Complete(OpCompletion::Meta))?;
                 Ok(meta)
-            },
-            Err(e) => {
-                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
-                Err(e)
-            }
-        }
+            })
     }
     
     pub async fn get_deps(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<Vec<Dependency>> {
         op_ev_handler.handle(OpEvent::Started)?;
         self.run_op(Operation::Deps, script, args).await?;
-        match self.msg_stream.get_deps(op_ev_handler.clone()).await {
-            Ok(deps) => {
+        self.msg_stream.get_deps(op_ev_handler.clone()).await
+            .and_then(|deps| {
                 op_ev_handler.handle(OpEvent::Complete(OpCompletion::Deps))?;
                 Ok(deps)
-            },
-            Err(e) => {
-                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
-                Err(e)
-            }
-        }
+            })
     }
     
     pub async fn check(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<(bool, ValueSet)> {
         op_ev_handler.handle(OpEvent::Started)?;
         self.run_op(Operation::Check, script, args).await?;
-        match self.msg_stream.get_check_values(op_ev_handler.clone()).await {
-            Ok((present, values)) => {
+        self.msg_stream.get_check_values(op_ev_handler.clone()).await
+            .and_then(|(present, values)| {
                 op_ev_handler.handle(OpEvent::Complete(OpCompletion::Check(present)))?;
                 Ok((present, values))
-            },
-            Err(e) => {
-                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
-                Err(e)
-            }
-        }
+            })
     }
     
     pub async fn apply(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<ValueSet> {
         op_ev_handler.handle(OpEvent::Started)?;
         self.run_op(Operation::Apply, script, args).await?;
-        match self.msg_stream.get_apply_values(op_ev_handler.clone()).await {
-            Ok(values) => {
+        self.msg_stream.get_apply_values(op_ev_handler.clone()).await
+            .and_then(|values| {
                 op_ev_handler.handle(OpEvent::Complete(OpCompletion::Apply))?;
                 Ok(values)
-            },
-            Err(e) => {
-                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
-                Err(e)
-            }
-        }
+            })
     }
     
     pub async fn remove(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<ValueSet> {
         op_ev_handler.handle(OpEvent::Started)?;
         self.run_op(Operation::Remove, script, args).await?;
-        match self.msg_stream.get_remove_values(op_ev_handler.clone()).await {
-            Ok(values) => {
+        self.msg_stream.get_remove_values(op_ev_handler.clone()).await
+            .and_then(|values| {
                 op_ev_handler.handle(OpEvent::Complete(OpCompletion::Remove))?;
                 Ok(values)
-            },
-            Err(e) => {
-                op_ev_handler.handle(OpEvent::Error(e.to_string()))?;
-                Err(e)
-            }
-        }
+            })
+
     }
 
     /// Runs an operation from the given script

@@ -135,7 +135,7 @@ impl Ctx {
                 }
 
                 self.enter_state(Error);
-                self.out.ln(&format!("{}", msg.red()));
+                self.out.indent_all(&format!("{}", msg.red()));
             }
             // The error state can only handle error events
             (Error, _) => unreachable!()

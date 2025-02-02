@@ -4,6 +4,7 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 
 use crate::models::{Operation, Unit, UnitArc, Dependency, Meta, ValueSet};
+use crate::events::OpEvent;
 use super::unit_execution::UnitExecution;
 use super::Context as EngineContext;
 use super::executor_pool::ExecutorPool;
@@ -34,27 +35,43 @@ impl Runner {
         let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Meta);
         let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
         let execution = self.get_unit_execution(unit.clone()).await;
-        execution.get_deps(executor_arc, op_ev_handler).await
+        execution.get_deps(executor_arc, op_ev_handler.clone()).await
+            .map_err(|e| {
+                op_ev_handler.handle(OpEvent::Error(e.to_string())).unwrap();
+                anyhow!("Failed to get deps for unit {} on target {}", &unit.name, &unit.target)
+            })
     }
     
     pub async fn remove(&mut self, unit: UnitArc) -> Result<()> {
         let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Remove);
         let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
         let execution = self.get_unit_execution(unit.clone()).await;
-        execution.remove(executor_arc, op_ev_handler).await
+        execution.remove(executor_arc, op_ev_handler.clone()).await
+            .map_err(|e| {
+                op_ev_handler.handle(OpEvent::Error(e.to_string())).unwrap();
+                anyhow!("Failed to remove unit {} on target {}", &unit.name, &unit.target)
+            })
     }
     
     pub async fn apply(&mut self, unit: UnitArc) -> Result<()> {
         let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Apply);
         let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
         let execution = self.get_unit_execution(unit.clone()).await;
-        execution.apply(executor_arc, op_ev_handler).await
+        execution.apply(executor_arc, op_ev_handler.clone()).await
+            .map_err(|e| {
+                op_ev_handler.handle(OpEvent::Error(e.to_string())).unwrap();
+                anyhow!("Failed to apply unit {} on target {}", &unit.name, &unit.target)
+            })
     }
 
     pub async fn check(&mut self, unit: UnitArc) -> Result<bool> {
         let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Check);
         let deps = {
-            let deps = self.get_deps(unit.clone()).await?;
+            let deps = self.get_deps(unit.clone()).await
+                .map_err(|e| {
+                    op_ev_handler.handle(OpEvent::Error(e.to_string())).unwrap();
+                    anyhow!("Failed to get deps for unit {} on target {}", &unit.name, &unit.target)
+                })?;
             deps.clone()
         };
         let captures = self.get_captures(unit.clone(), &deps).await?;
@@ -164,7 +181,11 @@ impl Runner {
         // Run the units meta operation to get its metadata
         let meta = {
             let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Meta);
-            execution.get_meta(executor_arc.clone(), op_ev_handler).await?
+            execution.get_meta(executor_arc.clone(), op_ev_handler.clone()).await
+                .map_err(|e| {
+                    op_ev_handler.handle(OpEvent::Error(e.to_string())).unwrap();
+                    anyhow!("Failed to get meta for unit {} on target {}", &unit.name, &unit.target)
+                })?
         };
 
         // Sets the arguments given for the unit on its execution so they can be used for

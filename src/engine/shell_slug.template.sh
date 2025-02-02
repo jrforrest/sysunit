@@ -12,11 +12,6 @@ params() _emit meta.params $@;
 emits() _ emit meta.emits $@;
 present() _emit present true;
 
-abort() {
-  echo "$1"
-  return 1
-}
-
 emit_value() {
   local key="${1:?key must be provided to emit_value}"
   shift

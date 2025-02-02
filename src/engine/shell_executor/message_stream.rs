@@ -76,7 +76,8 @@ impl<R: AsyncRead + Unpin> MessageStream<R> {
         status.expect_ok()?;
         let mut deps = Vec::new();
         for dep_msg in messages.iter() {
-            let parsed_deps = parse_deps(&dep_msg.text)?;
+            let parsed_deps = parse_deps(&dep_msg.text).
+                context(format!("Failed to parse dependency: {}", &dep_msg.text))?;
             deps.extend(parsed_deps);
         }
         Ok(deps)
@@ -101,7 +102,8 @@ impl<R: AsyncRead + Unpin> MessageStream<R> {
                 "desc" => meta.desc = Some(message.text.clone()),
                 "version" => meta.version = Some(message.text.clone()),
                 "params" => {
-                    meta.params = parse_params(&message.text)?;
+                    meta.params = parse_params(&message.text).
+                        context(format!("Failed to parse param: {}", &message.text))?;
                 },
                 _ => return Err(anyhow!("Unexpected message type for meta operation: {:?}", message)),
             }
@@ -133,7 +135,7 @@ impl<R: AsyncRead + Unpin> MessageStream<R> {
                 },
                 "value" => {
                     let value = parse_value(&message.text)
-                        .context("could not parse emitted value")?;
+                        .context(format!("Could not parse emitted value: {}", &message.text))?;
                     let key = match message.header.field {
                         Some(key) => key.clone(),
                         None => return Err(anyhow!("Value message missing field")),
@@ -166,7 +168,8 @@ impl<R: AsyncRead + Unpin> MessageStream<R> {
         let (status, drained_messages) = self.drain_messages_of_type("value", ev_handler).await?;
 
         for message in drained_messages {
-            let value = parse_value(&message.text)?;
+            let value = parse_value(&message.text).
+                map_err(|e| anyhow!("Could not parse emitted value: \"{}\": {}", &message.text, e))?;
             let key = match message.header.field {
                 Some(key) => key.clone(),
                 None => return Err(anyhow!("Value message missing field")),
