@@ -1,0 +1,6 @@
+[book]
+authors = ["Jack Forrest"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Sysunit Guide"
