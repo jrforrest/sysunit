@@ -156,7 +156,7 @@ mod tests {
     }
 
     impl DependencyFetcher<Node> for NodeLoader {
-        async fn get_node_dependencies(&self, node: Node) -> Result<Vec<Node>> {
+        async fn get_node_dependencies(&mut self, node: Node) -> Result<Vec<Node>> {
             node.deps.iter().map(|dep_id| {
                 match self.nodes.get(dep_id) {
                     Some(dep) => Ok(dep.clone()),

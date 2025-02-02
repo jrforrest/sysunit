@@ -8,7 +8,7 @@ use nom::{
     bytes::complete::tag,
     character::complete::digit1,
     branch::alt,
-    bytes::complete::take_until1,
+    bytes::complete::{take_until1, take_while1},
     character::complete::i32,
     sequence::{terminated, separated_pair},
     combinator::{recognize, map},
@@ -36,8 +36,14 @@ fn bool(input: &str) -> VResult<Value> {
     Ok((rest, Value::Bool(val == "true")))
 }
 
+fn unquoted_string(input: &str) -> VResult<Value> {
+    map(take_while1(|c| c != ' ' && c != '\t' && c != '\n' && c != ','), |value: &str| {
+        Value::String(value.to_string())
+    })(input)
+}
+
 pub fn value(input: &str) -> VResult<Value> {
-    ws(alt((string, float, int, bool)))(input)
+    ws(alt((string, float, int, bool, unquoted_string)))(input)
 }
 
 pub fn named_value(input: &str) -> VResult<(&str, Value)> {
@@ -55,8 +61,7 @@ mod tests {
             (rest, Value::String(parsed_string)) => {
                 assert_eq!(rest, "");
                 assert_eq!(parsed_string, "blarp");
-            },
-            _ => panic!("unexpected Value type"),
+            }, _ => panic!("unexpected Value type"),
         }
 
         let input = "'blarp hi world !@#'";
@@ -114,6 +119,18 @@ mod tests {
             (rest, Value::Int(parsed_int)) => {
                 assert_eq!(rest, "");
                 assert_eq!(parsed_int, 123);
+            },
+            _ => panic!("unexpected Value type"),
+        }
+    }
+
+    #[test]
+    fn test_unquoted_string() {
+        let input = "hello ";
+        match unquoted_string(input).unwrap() {
+            (rest, Value::String(parsed_string)) => {
+                assert_eq!(rest, " ");
+                assert_eq!(parsed_string, "hello");
             },
             _ => panic!("unexpected Value type"),
         }
