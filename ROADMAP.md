@@ -17,17 +17,18 @@
 ### 0.7
 
 
+- [x] Add a transport facility for files
 - [ ] Add unit aliases
   - An alias allows a unit (along with its arguments) to be referred to by a nicer label.
     this is primarily to allow rendering of units with long argument lists in the UI in
     a way that is meaningful from the unit that depends on it.
 - Syntax Ergonomics
-    - [ ] Update deps syntax so it doesn't conflict with shell chars
+    - [x] Update deps syntax so it doesn't conflict with shell chars
       - Right now the captures syntax makes quotes necessary around deps
-    - [ ] Allow string values in deps and emits to be unquoted
+    - [x] Allow string values in deps and emits to be unquoted
       - Shell quoting rules make double quoting necessary for these values right
         now.
-- [ ] CLI Improvements
+- [x] CLI Improvements
     - Show less states in default mode.  One line for loading a unit should be fine.
 
 ### 0.8
