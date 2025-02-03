@@ -14,7 +14,7 @@ Minimal state management tool for POSIX systems.
 ### Installation
 
 Sysunit is currently oriented towards the Rust community and is only
-distributed via [Crates.io](crates.io/crates/sysunit).
+distributed via [Crates.io](https://crates.io/crates/sysunit).
 
 ```sh
 cargo install sysunit
