@@ -3,7 +3,7 @@ name = "sysunit"
 version = "0.6.2"
 edition = "2021"
 description = "A minimal state management tool for POSIX systems"
-license = "AGPL"
+license = "	AGPL-3.0-only"
 authors = ["Jack Forrest <hello@jackforrest.codes>"]
 homepage = "https://jackforrest.codes/sysunit"
 
