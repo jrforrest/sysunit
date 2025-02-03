@@ -5,14 +5,16 @@
 ![Crates.io version](https://img.shields.io/crates/v/sysunit)
 ![Crates.io size](https://img.shields.io/crates/size/sysunit)
 
-
 Minimal state management tool for POSIX systems.
+
+![Sysunit Screenshot](https://jackforrest.me/sysu_screen.png)
 
 [Guide](https://jackforrest.me/sysunit)
 
 ### Installation
 
-Sysunit is currently oriented towards the Rust community and is only distributed via Cargo.
+Sysunit is currently oriented towards the Rust community and is only
+distributed via [Crates.io](crates.io/crates/sysunit).
 
 ```sh
 cargo install sysunit
