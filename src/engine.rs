@@ -11,6 +11,7 @@ mod unit_execution;
 mod shell_executor;
 mod runner;
 mod executor_pool;
+mod transport;
 
 pub use resolver::ResolvableNode;
 

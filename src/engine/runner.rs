@@ -1,13 +1,14 @@
 //! Contains logic for running operations on units and managing their execution state
 use std::collections::HashMap;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, Context};
 
-use crate::models::{Operation, Unit, UnitArc, Dependency, Meta, ValueSet};
-use crate::events::OpEvent;
+use crate::models::{Operation, Unit, UnitArc, Dependencies, Meta, ValueSet};
+use crate::events::{OpEvent, OpEventHandler};
 use super::unit_execution::UnitExecution;
 use super::Context as EngineContext;
 use super::executor_pool::ExecutorPool;
+use super::transport::transport_file;
 
 use super::{
     loader::Loader,
@@ -31,7 +32,7 @@ impl Runner {
         }
     }
     
-    pub async fn get_deps(&mut self, unit: UnitArc) -> Result<&Vec<Dependency>> {
+    pub async fn get_deps(&mut self, unit: UnitArc) -> Result<&Dependencies> {
         let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Meta);
         let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
         let execution = self.get_unit_execution(unit.clone()).await;
@@ -67,19 +68,20 @@ impl Runner {
     pub async fn check(&mut self, unit: UnitArc) -> Result<bool> {
         let op_ev_handler = self.ctx.ev_handler.get_op_handler(unit.clone(), Operation::Check);
         let deps = {
-            let deps = self.get_deps(unit.clone()).await
-                .map_err(|e| {
-                    op_ev_handler.handle(OpEvent::Error(e.to_string())).unwrap();
-                    anyhow!("Failed to get deps for unit {} on target {}", &unit.name, &unit.target)
-                })?;
+            let deps = self.get_deps(unit.clone()).await?;
             deps.clone()
         };
         let captures = self.get_captures(unit.clone(), &deps).await?;
+        op_ev_handler.handle(OpEvent::Started).unwrap();
+        self.transport_files(&unit, &deps, op_ev_handler.clone()).await?;
         let executor_arc = self.executor_pool.get_executor(&unit.target, self.ctx.clone()).await?;
         let execution = self.get_unit_execution(unit.clone()).await;
         execution.set_args(&captures).await;
-        let e = execution.check(executor_arc, op_ev_handler).await?;
-        Ok(e)
+        execution.check(executor_arc, op_ev_handler.clone()).await
+            .map_err(|e| {
+                op_ev_handler.handle(OpEvent::Error(e.to_string())).unwrap();
+                anyhow!("Failed to check unit {} on target {}", &unit.name, &unit.target)
+            })
     }
 
     async fn get_unit_execution(&mut self, unit: UnitArc) -> &mut UnitExecution {
@@ -89,6 +91,16 @@ impl Runner {
                 panic!("Unit not initialized: {:?}", unit);
             }
         }
+    }
+
+    async fn transport_files(&mut self, unit: &UnitArc, deps: &Dependencies, op_ev_handler: OpEventHandler) -> Result<()> {
+        for file in deps.files.iter() {
+            op_ev_handler.handle(OpEvent::TransportingFile(file.clone())).unwrap();
+            transport_file(&file, &unit.target).await?;
+            op_ev_handler.handle(OpEvent::FileTransported(file.clone())).unwrap();
+        }
+
+        Ok(())
     }
 
     // A unit first needs to have arguments injected.  Then before running check/apply, it
@@ -125,11 +137,11 @@ impl Runner {
     /// Assembles the arguments that should be passed to a unit which is to be executed.
     /// These include the arguments passed to the unit itself, as well as any captures
     /// from dependencies.
-    pub async fn get_captures(&self, unit: UnitArc, deps: &Vec<Dependency>) -> Result<ValueSet> { 
+    pub async fn get_captures(&self, unit: UnitArc, deps: &Dependencies) -> Result<ValueSet> { 
         let mut captures = ValueSet::new();
 
         // Check that all captures are present and of the correct type and add them to the args
-        for dep in deps.iter() {
+        for dep in deps.units.iter() {
             let target = match dep.target {
                 Some(ref target) => target.clone(),
                 None => unit.target.clone(),
@@ -207,10 +219,11 @@ impl DependencyFetcher<UnitArc> for Runner {
         let execution = if let Some(execution) = self.unit_executions.get(&unit) {
             execution
         } else {
-            self.load_unit(unit.clone()).await?
+            self.load_unit(unit.clone()).await
+                .context(format!("Failed to load unit {}", unit.name))?
         };
 
-        let units = execution.deps.as_ref().unwrap()
+        let units = execution.deps.as_ref().unwrap().units
             .iter()
             .map(|dep| {
                 let target = match dep.target {

@@ -1,9 +1,10 @@
+//! Parses emit messages and stdout lines from a unit's stdout
 use anyhow::{Result, anyhow, Context};
 
 use futures::io::AsyncRead;
 
-use crate::models::{EmitMessage, OpStatus, ValueSet, Meta, CheckPresence, StdoutData, Dependency};
-use crate::parser::{parse_deps, parse_params, parse_value};
+use crate::models::{EmitMessage, OpStatus, ValueSet, Meta, CheckPresence, StdoutData, FileDependency, Dependencies};
+use crate::parser::{parse_deps, parse_params, parse_value, parse_args};
 use crate::events::{OpEventHandler, OpEvent};
 
 use super::stdout_data::StdoutDataProducer;
@@ -71,14 +72,29 @@ impl<R: AsyncRead + Unpin> MessageStream<R> {
 
     /// Retreives and parses a series of dependency messages from the emit pipe,
     /// fails if the operation does not return a successful status.
-    pub async fn get_deps(&mut self, ev_handler: OpEventHandler) -> Result<Vec<Dependency>> {
+    pub async fn get_deps(&mut self, ev_handler: OpEventHandler) -> Result<Dependencies> {
         let (status, messages) = self.drain_messages_of_type("dep", ev_handler).await?;
         status.expect_ok()?;
-        let mut deps = Vec::new();
+        let mut deps = Dependencies::new();
         for dep_msg in messages.iter() {
-            let parsed_deps = parse_deps(&dep_msg.text).
-                context(format!("Failed to parse dependency: {}", &dep_msg.text))?;
-            deps.extend(parsed_deps);
+            let field = match dep_msg.header.field {
+                Some(ref f) => f,
+                None => return Err(anyhow!("Dependency message missing field")),
+            };
+
+            match field.as_str() {
+                "unit" => {
+                    let parsed_deps = parse_deps(&dep_msg.text).
+                        context(format!("Failed to parse dependency: {}", &dep_msg.text))?;
+                    deps.units.extend(parsed_deps);
+                },
+                "file" => {
+                    let args = parse_args(&dep_msg.text).
+                        context(format!("Failed to parse file args: {}", &dep_msg.text))?;
+                    deps.files.push(FileDependency::from_args(args)?);
+                },
+                _ => return Err(anyhow!("Unexpected message type for deps operation: {:?}", dep_msg)),
+            }
         }
         Ok(deps)
     }

@@ -1,15 +1,20 @@
 # Sysunit
 
 Sysunit is a minimal state management tool for POSIX systems. It's useful for
-thing like wrangling your development environment, configuring servers,
+things like wrangling your development environment, configuring servers,
 building code, provisioning containers and IoT devices, and automating
 deployments.
+
+<div style="text-align: center;">
+    <img src="https://jackforrest.me/sysu_screen.png" alt="Sysunit Screenshot" width="700"/>
+    <a href="https://github.com/jrforrest/sysunit">View on Github</a>
+</div>
 
 Instead of introducing a new language or requiring complex templating logic in
 configuration files to define desired state, Sysunit uses composable shell
 scripts to define units of change. This makes it easy for anyone familiar with
-basic shell programming to pick up, and units can be run against spartan systems
-such as devices running busybox or alpine containers.
+basic shell programming to pick up (this includes LLMs!) and units can be run
+against spartan systems such as devices running busybox or alpine containers.
 
 ## Qualities
 
@@ -44,7 +49,7 @@ such as devices running busybox or alpine containers.
 ## Installation
 
 Sysunit is oriented towards the Rust community until it reaches version 1.0, so
-it is only available via Cargo:
+it is only available via Cargo for now:
 
 ```sh
 cargo install sysunit

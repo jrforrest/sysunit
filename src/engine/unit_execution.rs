@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::models::{
     ValueSet,
     Meta,
-    Dependency,
+    Dependencies,
 };
 use crate::events::OpEventHandler;
 use super::executor_pool::ExecutorArc;
@@ -15,7 +15,7 @@ pub struct UnitExecution {
     pub script: String,
     pub args: ValueSet,
     pub emit_data: ValueSet,
-    pub deps: Option<Vec<Dependency>>,
+    pub deps: Option<Dependencies>,
     meta: Option<Meta>,
 }
 
@@ -51,7 +51,7 @@ impl UnitExecution {
 
     /// Gets and caches dependencies for the unit, running the deps operation on the given executor
     /// with events reported to op_ev_handler if they have not yet been fetched
-    pub async fn get_deps(&mut self, executor: ExecutorArc, op_ev_handler: OpEventHandler) -> Result<&Vec<Dependency>> {
+    pub async fn get_deps(&mut self, executor: ExecutorArc, op_ev_handler: OpEventHandler) -> Result<&Dependencies> {
         match self.deps {
             Some(ref deps) => Ok(deps),
             None => {

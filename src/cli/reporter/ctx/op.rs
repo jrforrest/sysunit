@@ -16,7 +16,8 @@ enum State {
     Root,
     Output,
     Error,
-    EmitData
+    EmitData,
+    TransportingFile,
 }
 
 impl Display for State {
@@ -27,6 +28,7 @@ impl Display for State {
             Output => "Output",
             Error => "Error",
             EmitData => "EmitData",
+            TransportingFile => "FileTransport",
         })
     }
 }
@@ -119,6 +121,20 @@ impl Ctx {
                     }
                 }
             }
+            (TransportingFile, OpE::TransportingFile(f)) => {
+                self.out.ln(&format!("Transporting file: {} -> {}", f.src, f.dest));
+            }
+            (TransportingFile, OpE::FileTransported(_)) => {
+                self.out.ln(&format!("{}", "OK".green().bold()));
+            }
+            (_, OpE::TransportingFile(_)) => {
+                self.enter_state(State::TransportingFile);
+                self.handle_op_ev(op_e);
+            }
+            (TransportingFile, _) => {
+                self.enter_state(Root);
+                self.handle_op_ev(op_e);
+            }
             (_, OpE::Error(msg)) => {
                 if ! matches!(self.state, State::Root) {
                     self.enter_state(State::Root)
@@ -138,7 +154,7 @@ impl Ctx {
                 self.out.indent_all(&format!("{}", msg.red()));
             }
             // The error state can only handle error events
-            (Error, _) => unreachable!()
+            (_, _) => unreachable!(),
         }
     }
 

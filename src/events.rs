@@ -2,7 +2,7 @@
 /// and unit execution can be reported to the CLI, logging
 /// and telemetry.
 
-use crate::models::{UnitArc, Operation, OpCompletion, StdoutData};
+use crate::models::{UnitArc, Operation, OpCompletion, StdoutData, FileDependency};
 use std::sync::{Arc, Mutex};
 use anyhow::Result;
 
@@ -23,6 +23,8 @@ pub enum OpEvent {
     Started,
     Output(StdoutData),
     Complete(OpCompletion),
+    TransportingFile(FileDependency),
+    FileTransported(FileDependency),
     Error(String),
 }
 

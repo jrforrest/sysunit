@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Result};
 use crate::engine::shell_executor::adapter::build_command;
 use crate::{
-    models::{Target, Operation, ValueSet, Dependency, Meta, OpCompletion},
+    models::{Target, Operation, ValueSet, Dependencies, Meta, OpCompletion},
     events::{Event, OpEventHandler, OpEvent},
 };
 
@@ -11,7 +11,7 @@ use async_process::ChildStdout;
 
 use super::Context as EngineContext;
 
-mod subprocess;
+pub mod subprocess;
 mod stdout_data;
 mod message_stream;
 mod adapter;
@@ -23,6 +23,7 @@ const SHELL_SLUG: &str = include_str!("shell_slug.template.sh");
 
 /// Executes a unit's shell script and provides an interface to interract with it
 pub struct ShellExecutor {
+    target: Target,
     subprocess: Subprocess,
     ctx: EngineContext,
     msg_stream: MessageStream<ChildStdout>,
@@ -39,6 +40,7 @@ impl ShellExecutor {
         let msg_stream = MessageStream::new(stdout_parser);
 
         let mut executor = ShellExecutor {
+            target: target.clone(),
             subprocess,
             ctx,
             msg_stream,
@@ -59,7 +61,7 @@ impl ShellExecutor {
             })
     }
     
-    pub async fn get_deps(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<Vec<Dependency>> {
+    pub async fn get_deps(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<Dependencies> {
         op_ev_handler.handle(OpEvent::Started)?;
         self.run_op(Operation::Deps, script, args).await?;
         self.msg_stream.get_deps(op_ev_handler.clone()).await
@@ -70,7 +72,6 @@ impl ShellExecutor {
     }
     
     pub async fn check(&mut self, op_ev_handler: OpEventHandler, script: &str, args: &ValueSet) -> Result<(bool, ValueSet)> {
-        op_ev_handler.handle(OpEvent::Started)?;
         self.run_op(Operation::Check, script, args).await?;
         self.msg_stream.get_check_values(op_ev_handler.clone()).await
             .and_then(|(present, values)| {
