@@ -33,9 +33,9 @@ This can be accomplished by setting the target for dependencies.
 # dev_env.sh
 
 deps() {
-    dep local://localhost pkg.sh:name=ssh
-    dep ssh://admin@my_server.net/pkg.sh:name=python3
-    dep ssh://admin@my_server.net pkg.sh:name=tmux
+    dep local://localhost:pkg.sh name=ssh
+    dep ssh://admin@my_server.net:pkg.sh name=python3
+    dep ssh://admin@my_server.net:pkg.sh name=tmux
 }
 ```
 
@@ -50,3 +50,25 @@ As with the local adapter, only one instance of an adapter per target is initial
 per Sysunit invocation. This means that if you have multiple units targeting the same
 system, they will be run in the same session.
 
+### Target Inheritance
+
+When a unit is run with a target, that target is inherited by its dependencies, so units
+don't need to explicitly set targets for their dependencies unless they need to target
+another system.
+
+### Dynamic Targets
+
+As with everything else in dependencies, target strings are scriptable, so you can
+do things like dynamic inventory using parameters.
+
+```sh
+install_nethack.sh
+
+meta() {
+    params !user:string, !host:string
+}
+
+deps() {
+    dep ssh://$user@$host:pkg.sh name=nethack
+}
+```

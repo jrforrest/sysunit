@@ -1,6 +1,6 @@
 # Guide
 
-This is slow introduction to Sysunit, and assumes only a basic understanding of
+This is a slower introduction to Sysunit, and assumes only a basic understanding of
 shell scripting. Folks who like to puzzle things out for themselves might gain a
 more rapid familiarity from the [cookbook](cookbook.md).
 

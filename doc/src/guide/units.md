@@ -47,7 +47,7 @@ See [How It Works](how_it_works.md) for more information on why this is the case
 
 The unit above is not idempotent, so Sysunit will run it every time you call
 `sysunit apply foo_file.sh`. To make it idempotent, you can add a `check` hook.
-Let's also provide a hook so sysunit can remove the file.
+Let's also provide a `remove` hook so sysunit can remove the file.
 
 ```sh
 # foo_file.sh

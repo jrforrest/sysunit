@@ -4,13 +4,17 @@ but there's only a couple of tricks going on here to get them to work.
 ## Shell Execution
 
 Sysunit simply pipes your scripts into a shell interpreter, potentially over
-some intermediary like SSH or Docker, runs its hooks, and captures the output.
+some intermediary like SSH or Docker, runs its hooks, and parses its output
+to separate emitted values from regular output.
 
 Execution of hooks from units is interleaved, since, for example, dependencies
-of a unit need to be known and executed before it is. These hooks are all run
-in subshells, so they can't affect the environment of other units.
+need to be retrieved from a unit (which requires executing its deps hook)
+before its `check` and `apply` or `remove` hooks are run. These hooks are all
+run in subshells, so they don't affect the environment of other units.
 
 ## Hooks
+
+# How Sysunit Works
 
 The shell environment hooks run in is set up with someting like this:
 

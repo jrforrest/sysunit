@@ -1,4 +1,4 @@
-## Dependencies
+# Dependencies
 
 Single units can be useful, but the goal of Sysunit is to allow them to be
 easily composed to express complex desired system states. This is mostly
@@ -59,8 +59,10 @@ apply() echo "helloooo" > /tmp/scratch/foo;
 ```
 
 ```sh
+#cat_pic.sh
+
 check() {
-    if [ -f /tmp/scratch/foo ]; then
+    if [ -f /tmp/scratch/cat.jpg ]; then
         present
     fi
 }
@@ -80,7 +82,7 @@ check() {
 apply() mkdir -p /tmp/scratch
 ```
 
-```
+```sh
 #project_files.sh
 
 deps() {
@@ -98,7 +100,7 @@ When we run `sysunit apply project_files.sh`, Sysunit will run the units in this
 
 Note that scratch\_dir is only run once, even though two units include it in their deps.
 
-## Dynamic Dependency Parameters
+## Dynamic Dependencies
 
 When we define parameters that our unit can accept, they are injected prior to running the
 `deps` hook. This allows us to define dependencies that are based on parameters of our unit:
@@ -114,7 +116,7 @@ deps() {
     if $url | grep -q '^ssh'; then
        dep pkg.sh name=scp 
     else
-        dep pkg.sh name=curl
+       dep pkg.sh name=curl
     fi
 }
 
@@ -126,6 +128,15 @@ apply() {
     fi
 }
 ```
+
+As with all other hooks, the `deps` hook can run any arbitrary shell code, and is executed
+on the target system
+
+Unlike Metadata, deps are intended to be dynamic, and that capability is very powerful.
+However, some users may not desire the lack of determinism in knowing which dependencies
+will be run when they invoke a unit. The Execution Plan output intends to provide clarity
+on what dynamic units have been selected, but use of this feature can be avoided for those
+who don't desire it.
 
 ## Dynamic Parameters
 

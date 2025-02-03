@@ -80,3 +80,31 @@ apply() {
     echo ${name:-Jack} > /tmp/my_name
 }
 ```
+
+### Other Metadata
+
+The `meta` hook also allows specifying some additional Metadata which will help
+document your units.
+
+```sh
+# foo_file.sh
+
+meta() {
+    author "Jack Forrest"
+    desc "Writes some stuff to /tmp/foo"
+    version "0.5.0"
+}
+```
+
+None of this is required, or used much within sysunit currently, but it's readily
+legible and will likely be presented in a more useful form by the Sysunit CLI soon.
+
+### Dynamic Metadata
+
+It is possible to script the meta hook, so you could dynamically define parameters
+based on the environment. All hooks for a unit are executed on the target system,
+so facts are available here.
+
+However, **this is heavily discouraged**. It will be confusing to yourself and other
+users of your units if these things change between invocations.
+
