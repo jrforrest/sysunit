@@ -1304,8 +1304,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "sysu"
-version = "0.1.0"
+name = "sysunit"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "async-process",
