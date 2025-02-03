@@ -1,5 +1,7 @@
 # Sysunit
 
+![GitHub branch status](https://img.shields.io/github/checks-status/jrforrest/sysunit/master)
+
 Minimal state management tool for POSIX systems.
 
 [Guide](https://jackforrest.me/sysunit)
