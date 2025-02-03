@@ -10,7 +10,7 @@
   - [Targets](guide/targets.md)
   - [Path and Unitfiles](guide/path_and_unitfiles.md)
 - [Cookbook](./cookbook.md)
-  - [Instaling Software From Tarballs](cookbook/installing_from_tarballs.md)
+  - [Installing Software From Tarballs](cookbook/installing_from_tarballs.md)
   - [Provisioning a Docker Container](cookbook/provisioning_docker.md)
 - [How It Works](./how_it_works.md)
 - [About The Project](./about.md)

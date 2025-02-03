@@ -7,7 +7,10 @@ deployments.
 
 <div style="text-align: center;">
     <img src="https://jackforrest.me/sysu_screen.png" alt="Sysunit Screenshot" width="700"/>
+    <br />
     <a href="https://github.com/jrforrest/sysunit">View on Github</a>
+    <br />
+    <a href="https://crates.io/crates/sysunit">View on Crates.io</a>
 </div>
 
 Instead of introducing a new language or requiring complex templating logic in
