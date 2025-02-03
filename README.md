@@ -1,6 +1,6 @@
 # Sysunit
 
-![GitHub branch status](https://img.shields.io/github/checks-status/jrforrest/sysunit/master)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/jrforrest/sysunit/rust.yml)
 ![Crates.io license](https://img.shields.io/crates/l/sysunit)
 ![Crates.io version](https://img.shields.io/crates/v/sysunit)
 ![Crates.io size](https://img.shields.io/crates/size/sysunit)
